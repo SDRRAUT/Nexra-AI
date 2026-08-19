@@ -48,9 +48,11 @@ const priorityColors: Record<string, string> = {
   low: 'var(--priority-low)',
 }
 
+import { getClientGoals, createClientGoal, deleteClientGoal } from '@/lib/data/clientData'
+
 export default function GoalsPage() {
   const router = useRouter()
-  const [goals, setGoals] = useState<Goal[]>([])
+  const [goals, setGoals] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
   const [newGoal, setNewGoal] = useState({
@@ -63,9 +65,19 @@ export default function GoalsPage() {
 
   const fetchGoals = async () => {
     try {
-      const res = await fetch('/api/goals')
-      const data = await res.json()
-      setGoals(Array.isArray(data) ? data : [])
+      // 1. Try local offline data first
+      const localGoals = await getClientGoals()
+      if (localGoals && localGoals.length > 0) {
+        setGoals(localGoals)
+        setLoading(false)
+      }
+
+      // 2. Also try API if server is reachable
+      const res = await fetch('/api/goals').catch(() => null)
+      if (res && res.ok) {
+        const data = await res.json()
+        if (Array.isArray(data)) setGoals(data)
+      }
     } catch {
     } finally {
       setLoading(false)
@@ -78,6 +90,14 @@ export default function GoalsPage() {
 
   const addGoal = async () => {
     if (!newGoal.title.trim()) return
+    await createClientGoal({
+      title: newGoal.title,
+      description: newGoal.description,
+      category: newGoal.category,
+      priority: newGoal.priority,
+      targetDate: newGoal.targetDate ? new Date(newGoal.targetDate).toISOString() : undefined,
+    }).catch(() => {})
+
     await fetch('/api/goals', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -88,7 +108,8 @@ export default function GoalsPage() {
         priority: newGoal.priority,
         targetDate: newGoal.targetDate ? new Date(newGoal.targetDate).toISOString() : undefined,
       }),
-    })
+    }).catch(() => {})
+
     setNewGoal({ title: '', description: '', category: 'study', priority: 'high', targetDate: '' })
     setShowAdd(false)
     fetchGoals()
@@ -287,7 +308,7 @@ export default function GoalsPage() {
                     <div style={{ marginTop: 'var(--space-4)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                         <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-tertiary)' }}>
-                          {goal.tasks.length > 0 ? `${goal.tasks.filter(t => t.status === 'completed').length}/${goal.tasks.length} tasks finished` : 'Progress'}
+                          {(goal.tasks || []).length > 0 ? `${(goal.tasks || []).filter((t: any) => t.status === 'completed').length}/${(goal.tasks || []).length} tasks finished` : 'Progress'}
                         </span>
                         <span style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-sm)', fontWeight: 800, color: 'var(--brand-primary)' }}>
                           {pct}%

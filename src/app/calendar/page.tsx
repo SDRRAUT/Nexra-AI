@@ -67,12 +67,14 @@ const priorityColors: Record<string, string> = {
   low: 'var(--priority-low)',
 }
 
+import { getClientEvents, getClientTasks, createClientEvent, deleteClientEvent } from '@/lib/data/clientData'
+
 export default function CalendarPage() {
   const router = useRouter()
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState(new Date())
-  const [events, setEvents] = useState<Event[]>([])
-  const [tasks, setTasks] = useState<Task[]>([])
+  const [events, setEvents] = useState<any[]>([])
+  const [tasks, setTasks] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [calendarMode, setCalendarMode] = useState<'week' | 'month'>('week')
   const [showAddEvent, setShowAddEvent] = useState(false)
@@ -87,16 +89,25 @@ export default function CalendarPage() {
   useEffect(() => {
     const start = startOfMonth(currentDate)
     const end = endOfMonth(currentDate)
+
+    // 1. Try local offline data first
+    Promise.all([getClientEvents(), getClientTasks()]).then(([ev, ta]) => {
+      if (ev) setEvents(ev)
+      if (ta) setTasks(ta)
+      setLoading(false)
+    }).catch(() => {})
+
+    // 2. Also try API if reachable
     Promise.all([
-      fetch(`/api/events?startDate=${start.toISOString()}&endDate=${end.toISOString()}`).then(r => r.json()),
-      fetch('/api/tasks').then(r => r.json()),
+      fetch(`/api/events?startDate=${start.toISOString()}&endDate=${end.toISOString()}`).then(r => r.json()).catch(() => null),
+      fetch('/api/tasks').then(r => r.json()).catch(() => null),
     ])
       .then(([ev, ta]) => {
-        setEvents(Array.isArray(ev) ? ev : [])
-        setTasks(Array.isArray(ta) ? ta : [])
-        setLoading(false)
+        if (Array.isArray(ev)) setEvents(ev)
+        if (Array.isArray(ta)) setTasks(ta)
       })
-      .catch(() => setLoading(false))
+      .catch(() => {})
+      .finally(() => setLoading(false))
   }, [currentDate])
 
   // Month days

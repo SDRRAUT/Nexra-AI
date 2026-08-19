@@ -4,6 +4,7 @@ import { useRef, useEffect, useState, useCallback } from 'react'
 import AppHeader from '@/components/layout/AppHeader'
 import BottomNav from '@/components/layout/BottomNav'
 import { format, formatDistanceToNow } from 'date-fns'
+import { streamClientChat } from '@/lib/ai/clientAi'
 
 interface ChatMessage {
   id: string
@@ -200,49 +201,80 @@ export default function ChatPage() {
     let assistantText = ''
 
     try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          conversationId: activeConvId,
-          messages: newMessages.map(m => ({ role: m.role, content: m.content })),
-        }),
-      })
-
-      if (!response.ok || !response.body) {
-        throw new Error('Failed to get response from Srushti')
+      // First try /api/chat if server is running
+      let response: Response | null = null
+      try {
+        response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            conversationId: activeConvId,
+            messages: newMessages.map(m => ({ role: m.role, content: m.content })),
+          }),
+        })
+      } catch (e) {
+        response = null
       }
 
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder()
+      if (response && response.ok && response.body) {
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder()
 
-      // Record first token latency
-      const firstTokenMs = Math.round(performance.now() - sendTimeRef.current)
-      firstTokenTimeRef.current = firstTokenMs
-      setLiveLatency(firstTokenMs)
+        const firstTokenMs = Math.round(performance.now() - sendTimeRef.current)
+        firstTokenTimeRef.current = firstTokenMs
+        setLiveLatency(firstTokenMs)
 
-      // Add assistant placeholder message
-      setMessages(prev => [
-        ...prev,
-        {
-          id: assistantMsgId,
-          role: 'assistant',
-          content: '',
-          createdAt: new Date(),
-          latencyMs: firstTokenMs,
-        },
-      ])
+        setMessages(prev => [
+          ...prev,
+          {
+            id: assistantMsgId,
+            role: 'assistant',
+            content: '',
+            createdAt: new Date(),
+            latencyMs: firstTokenMs,
+          },
+        ])
 
-      setIsStreaming(true)
+        setIsStreaming(true)
 
-      while (true) {
-        const { value, done } = await reader.read()
-        if (done) break
-        const chunk = decoder.decode(value, { stream: true })
-        assistantText += chunk
+        while (true) {
+          const { value, done } = await reader.read()
+          if (done) break
+          const chunk = decoder.decode(value, { stream: true })
+          assistantText += chunk
+          setMessages(prev =>
+            prev.map(m => (m.id === assistantMsgId ? { ...m, content: assistantText } : m))
+          )
+        }
+      } else {
+        // Standalone APK Mode: Direct Gemini Cloud API Call
+        const firstTokenMs = Math.round(performance.now() - sendTimeRef.current)
+        firstTokenTimeRef.current = firstTokenMs
+        setLiveLatency(firstTokenMs)
 
-        setMessages(prev =>
-          prev.map(m => (m.id === assistantMsgId ? { ...m, content: assistantText } : m))
+        setMessages(prev => [
+          ...prev,
+          {
+            id: assistantMsgId,
+            role: 'assistant',
+            content: '',
+            createdAt: new Date(),
+            latencyMs: firstTokenMs,
+          },
+        ])
+
+        setIsStreaming(true)
+
+        await streamClientChat(
+          newMessages.map(m => ({ role: m.role, content: m.content })),
+          {
+            onChunk: (chunk) => {
+              assistantText += chunk
+              setMessages(prev =>
+                prev.map(m => (m.id === assistantMsgId ? { ...m, content: assistantText } : m))
+              )
+            }
+          }
         )
       }
 

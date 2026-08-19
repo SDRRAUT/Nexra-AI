@@ -82,6 +82,8 @@ const PlusIcon = () => (
   </svg>
 )
 
+import { getClientDashboard, updateClientTask, deleteClientTask, createClientTask, type DashboardData as LocalDashData } from '@/lib/data/clientData'
+
 export default function HomePage() {
   const router = useRouter()
   const [data, setData] = useState<DashboardData | null>(null)
@@ -94,12 +96,49 @@ export default function HomePage() {
 
   const fetchDashboard = async () => {
     try {
+      // 1. Try instant offline local DB first
+      const localData = await getClientDashboard()
+      if (localData) {
+        const todayTasks: Task[] = localData.todayTasks as any
+        const nextTask = todayTasks.find(t => t.status !== 'completed') || null
+        setData({
+          user: { name: localData.user.name || 'Sanket', timezone: localData.user.timezone || 'Asia/Kolkata' },
+          today: {
+            date: new Date().toISOString(),
+            tasks: todayTasks,
+            events: (localData.upcomingEvents || []) as any,
+            completedCount: localData.completedTodayCount,
+            totalCount: localData.totalTodayCount,
+            progressPercent: localData.progressPercent,
+            nextTask,
+          },
+          critical: todayTasks.filter(t => t.priority === 'critical' || t.priority === 'high'),
+          upcoming: todayTasks,
+          goals: (localData.goals || []) as any,
+          atRisk: 0,
+          overdue: [],
+          recentActions: [],
+          notifications: [],
+          unreadCount: 0,
+        })
+        setBriefing({
+          userName: localData.user.name || 'Sanket',
+          isEvening: new Date().getHours() >= 17,
+          briefingTitle: localData.briefing.greeting,
+          briefingText: localData.briefing.summary,
+          aiRecommendation: 'Stay focused on high-priority milestones today.',
+          missedTasks: [],
+        })
+        setLoading(false)
+      }
+
+      // 2. Also try API if server is reachable
       const [dashRes, briefRes] = await Promise.all([
-        fetch('/api/dashboard').then(r => r.json()),
-        fetch('/api/briefing').then(r => r.json()),
+        fetch('/api/dashboard').then(r => r.json()).catch(() => null),
+        fetch('/api/briefing').then(r => r.json()).catch(() => null),
       ])
-      setData(dashRes)
-      setBriefing(briefRes)
+      if (dashRes && dashRes.today) setData(dashRes)
+      if (briefRes && briefRes.briefingTitle) setBriefing(briefRes)
     } catch (e) {
       console.error(e)
     } finally {
@@ -115,29 +154,32 @@ export default function HomePage() {
 
   const handleToggleTask = async (task: Task) => {
     const newStatus = task.status === 'completed' ? 'planned' : 'completed'
+    await updateClientTask(task.id, { status: newStatus }).catch(() => {})
     await fetch(`/api/tasks/${task.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: newStatus }),
-    })
+    }).catch(() => {})
     fetchDashboard()
   }
 
   const handleDeleteTask = async (id: string, title: string, e: React.MouseEvent) => {
     e.stopPropagation()
     if (confirm(`⚠️ Are you sure you want to delete task "${title}"?`)) {
-      await fetch(`/api/tasks/${id}`, { method: 'DELETE' })
+      await deleteClientTask(id).catch(() => {})
+      await fetch(`/api/tasks/${id}`, { method: 'DELETE' }).catch(() => {})
       fetchDashboard()
     }
   }
 
   const handleAddTask = async () => {
     if (!newTask.title.trim()) return
+    await createClientTask(newTask).catch(() => {})
     await fetch('/api/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newTask),
-    })
+    }).catch(() => {})
     setNewTask({ title: '', priority: 'medium', category: 'personal', estimatedMinutes: 30 })
     setShowAddSheet(false)
     fetchDashboard()
