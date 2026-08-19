@@ -177,8 +177,24 @@ export async function POST(req: NextRequest) {
       content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content || ''),
     }))
 
+    // Resolve API key from runtime env or Database Preference
+    let activeApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
+    if (!activeApiKey) {
+      const keyPref = await prisma.preference.findUnique({
+        where: { userId_key: { userId: DEFAULT_USER_ID, key: 'gemini_api_key' } },
+      })
+      activeApiKey = keyPref?.value || ''
+    }
+
+    if (!activeApiKey) {
+      return new Response(
+        JSON.stringify({ error: 'Gemini API key is not configured. Please add your API key in Settings.' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
     const result = streamText({
-      model: getModel('fast'),
+      model: getModel('fast', activeApiKey),
       system: systemPrompt,
       messages: formattedMessages,
       tools: allTools,
