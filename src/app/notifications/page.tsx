@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import AppHeader from '@/components/layout/AppHeader'
 import BottomNav from '@/components/layout/BottomNav'
 import { format, formatDistanceToNow } from 'date-fns'
+import { sendNativeNotification } from '@/lib/notifications/native'
 
 interface Notification {
   id: string
@@ -85,16 +86,26 @@ export default function NotificationsPage() {
   }
 
   const sendTestAlert = async () => {
+    const alertTitle = '🌱 Srushti Accountability Check'
+    const alertBody = 'You planned "Review Lecture Notes" for today. Are you ready to begin your focus block?'
+
     await fetch('/api/notifications', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        title: '🌱 Srushti Accountability Check',
-        body: 'You planned "Review Lecture Notes" for today. Are you ready to begin your focus block?',
+        title: alertTitle,
+        body: alertBody,
         type: 'accountability',
         actionType: 'start_now,reschedule',
       }),
     })
+
+    // Also trigger native OS lockscreen notification
+    await sendNativeNotification({
+      title: alertTitle,
+      body: alertBody,
+    })
+
     fetchNotifications()
   }
 

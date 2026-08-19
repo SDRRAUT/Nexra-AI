@@ -51,6 +51,7 @@ export default function SettingsPage() {
   const [showApiKey, setShowApiKey] = useState(false)
   const [isSavingKey, setIsSavingKey] = useState(false)
   const [isTestingKey, setIsTestingKey] = useState(false)
+  const [showEditKey, setShowEditKey] = useState(false)
   const [keyFeedback, setKeyFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
 
   // Backup / Import Export State
@@ -129,6 +130,7 @@ export default function SettingsPage() {
       if (res.ok && data.success) {
         setKeyFeedback({ type: 'success', message: '✅ API key verified & saved locally in your database!' })
         setApiKeyInput('')
+        setShowEditKey(false)
         fetchApiKeyStatus()
         setTimeout(() => setKeyFeedback(null), 4000)
       } else {
@@ -170,6 +172,7 @@ export default function SettingsPage() {
       await fetch('/api/settings/apikey', { method: 'DELETE' })
       setKeyFeedback({ type: 'info', message: 'API key removed.' })
       fetchApiKeyStatus()
+      setShowEditKey(false)
       setTimeout(() => setKeyFeedback(null), 3000)
     }
   }
@@ -301,6 +304,158 @@ export default function SettingsPage() {
     </div>
   )
 
+  // ── RENDER API KEY CARD ───────────────────────────────────
+  const renderApiKeySection = (isDimmedAtBottom: boolean) => (
+    <div
+      style={{
+        marginBottom: 'var(--space-6)',
+        opacity: isDimmedAtBottom ? 0.65 : 1,
+        transition: 'opacity 0.25s ease',
+      }}
+      onMouseEnter={e => { if (isDimmedAtBottom) (e.currentTarget as HTMLElement).style.opacity = '1' }}
+      onMouseLeave={e => { if (isDimmedAtBottom) (e.currentTarget as HTMLElement).style.opacity = '0.65' }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
+        <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+          🔑 AI Engine & API Key
+        </div>
+        <span
+          style={{
+            fontSize: '11px',
+            fontWeight: 700,
+            padding: '2px 8px',
+            borderRadius: 'var(--radius-full)',
+            background: apiKeyStatus.hasKey ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+            color: apiKeyStatus.hasKey ? 'var(--status-success)' : 'var(--status-error)',
+          }}
+        >
+          {apiKeyStatus.hasKey ? '✅ Active & Connected' : '⚠️ Key Missing'}
+        </span>
+      </div>
+
+      <div className="card fade-in-up" style={{ padding: 'var(--space-4) var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+          Your Google Gemini API key is stored locally in your SQLite database. It is never exposed publicly.
+        </div>
+
+        {apiKeyStatus.hasKey && (
+          <div
+            style={{
+              padding: '8px 12px',
+              background: 'var(--bg-muted)',
+              borderRadius: 'var(--radius-md)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              fontSize: 'var(--text-xs)',
+            }}
+          >
+            <div>
+              <span style={{ color: 'var(--text-tertiary)' }}>Current Key: </span>
+              <strong style={{ color: 'var(--text-primary)', fontFamily: 'monospace' }}>{apiKeyStatus.maskedKey}</strong>
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={handleTestApiKey}
+                disabled={isTestingKey}
+                style={{ fontSize: '11px', padding: '3px 8px' }}
+              >
+                {isTestingKey ? 'Testing...' : '⚡ Test'}
+              </button>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => setShowEditKey(!showEditKey)}
+                style={{ fontSize: '11px', padding: '3px 8px' }}
+              >
+                {showEditKey ? 'Cancel' : 'Edit'}
+              </button>
+              <button
+                className="btn btn-danger btn-sm"
+                onClick={handleRemoveApiKey}
+                style={{ fontSize: '11px', padding: '3px 8px' }}
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        )}
+
+        {(!apiKeyStatus.hasKey || showEditKey) && (
+          <div className="input-group" style={{ marginTop: 'var(--space-2)' }}>
+            <label className="input-label">
+              {apiKeyStatus.hasKey ? 'Replace Gemini API Key' : 'Enter Gemini API Key'}
+            </label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ position: 'relative', flex: 1 }}>
+                <input
+                  id="settings-api-key-input"
+                  type={showApiKey ? 'text' : 'password'}
+                  className="input"
+                  value={apiKeyInput}
+                  onChange={e => setApiKeyInput(e.target.value)}
+                  placeholder="AIzaSy..."
+                  style={{ paddingRight: 40 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  style={{
+                    position: 'absolute',
+                    right: 10,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-tertiary)',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                  }}
+                >
+                  {showApiKey ? '🙈' : '👁️'}
+                </button>
+              </div>
+              <button
+                className="btn btn-primary"
+                onClick={handleSaveApiKey}
+                disabled={isSavingKey || !apiKeyInput.trim()}
+                id="save-api-key-btn"
+              >
+                {isSavingKey ? 'Saving...' : 'Save Key'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {keyFeedback && (
+          <div
+            className="fade-in-up"
+            style={{
+              padding: '8px 12px',
+              borderRadius: 'var(--radius-md)',
+              fontSize: 'var(--text-xs)',
+              fontWeight: 600,
+              background:
+                keyFeedback.type === 'success'
+                  ? 'rgba(16, 185, 129, 0.15)'
+                  : keyFeedback.type === 'error'
+                  ? 'rgba(239, 68, 68, 0.15)'
+                  : 'rgba(91, 107, 240, 0.15)',
+              color:
+                keyFeedback.type === 'success'
+                  ? 'var(--status-success)'
+                  : keyFeedback.type === 'error'
+                  ? 'var(--status-error)'
+                  : 'var(--brand-primary)',
+            }}
+          >
+            {keyFeedback.message}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+
   return (
     <div className="app-shell">
       <AppHeader />
@@ -329,253 +484,8 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* ── AI API KEY CONFIGURATION (LOCAL DB STORAGE) ─── */}
-          <div style={{ marginBottom: 'var(--space-6)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
-              <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-                🔑 AI Engine & API Key
-              </div>
-              <span
-                style={{
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  padding: '2px 8px',
-                  borderRadius: 'var(--radius-full)',
-                  background: apiKeyStatus.hasKey ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
-                  color: apiKeyStatus.hasKey ? 'var(--status-success)' : 'var(--status-error)',
-                }}
-              >
-                {apiKeyStatus.hasKey ? '✅ Active & Connected' : '⚠️ Key Missing'}
-              </span>
-            </div>
-
-            <div className="card fade-in-up" style={{ padding: 'var(--space-4) var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                Your Google Gemini API key is stored locally in your SQLite database. It is never exposed publicly.
-              </div>
-
-              {apiKeyStatus.hasKey && (
-                <div
-                  style={{
-                    padding: '8px 12px',
-                    background: 'var(--bg-muted)',
-                    borderRadius: 'var(--radius-md)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    fontSize: 'var(--text-xs)',
-                  }}
-                >
-                  <div>
-                    <span style={{ color: 'var(--text-tertiary)' }}>Current Key: </span>
-                    <strong style={{ color: 'var(--text-primary)', fontFamily: 'monospace' }}>{apiKeyStatus.maskedKey}</strong>
-                  </div>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <button
-                      className="btn btn-secondary btn-sm"
-                      onClick={handleTestApiKey}
-                      disabled={isTestingKey}
-                      style={{ fontSize: '11px', padding: '3px 8px' }}
-                    >
-                      {isTestingKey ? 'Testing...' : '⚡ Test'}
-                    </button>
-                    <button
-                      className="btn btn-danger btn-sm"
-                      onClick={handleRemoveApiKey}
-                      style={{ fontSize: '11px', padding: '3px 8px' }}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <div className="input-group" style={{ marginTop: 'var(--space-2)' }}>
-                <label className="input-label">
-                  {apiKeyStatus.hasKey ? 'Update Gemini API Key' : 'Enter Gemini API Key'}
-                </label>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <div style={{ position: 'relative', flex: 1 }}>
-                    <input
-                      id="settings-api-key-input"
-                      type={showApiKey ? 'text' : 'password'}
-                      className="input"
-                      value={apiKeyInput}
-                      onChange={e => setApiKeyInput(e.target.value)}
-                      placeholder="AIzaSy..."
-                      style={{ paddingRight: 40 }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowApiKey(!showApiKey)}
-                      style={{
-                        position: 'absolute',
-                        right: 10,
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        background: 'transparent',
-                        border: 'none',
-                        color: 'var(--text-tertiary)',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                      }}
-                    >
-                      {showApiKey ? '🙈' : '👁️'}
-                    </button>
-                  </div>
-                  <button
-                    className="btn btn-primary"
-                    onClick={handleSaveApiKey}
-                    disabled={isSavingKey || !apiKeyInput.trim()}
-                    id="save-api-key-btn"
-                  >
-                    {isSavingKey ? 'Saving...' : 'Save Key'}
-                  </button>
-                </div>
-              </div>
-
-              {keyFeedback && (
-                <div
-                  className="fade-in-up"
-                  style={{
-                    padding: '8px 12px',
-                    borderRadius: 'var(--radius-md)',
-                    fontSize: 'var(--text-xs)',
-                    fontWeight: 600,
-                    background:
-                      keyFeedback.type === 'success'
-                        ? 'rgba(16, 185, 129, 0.15)'
-                        : keyFeedback.type === 'error'
-                        ? 'rgba(239, 68, 68, 0.15)'
-                        : 'rgba(91, 107, 240, 0.15)',
-                    color:
-                      keyFeedback.type === 'success'
-                        ? 'var(--status-success)'
-                        : keyFeedback.type === 'error'
-                        ? 'var(--status-error)'
-                        : 'var(--brand-primary)',
-                  }}
-                >
-                  {keyFeedback.message}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* ── BACKUP, EXPORT & IMPORT DATA ────────────── */}
-          <div style={{ marginBottom: 'var(--space-6)' }}>
-            <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 'var(--space-3)' }}>
-              📦 Data Backup & Portability
-            </div>
-
-            <div className="card fade-in-up" style={{ padding: 'var(--space-4) var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                Export your full SQLite database snapshot (tasks, goals, habits, memories, calendar, expenses) as a JSON file or restore from a backup.
-              </div>
-
-              {/* Action Buttons */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                {/* Export Button */}
-                <button
-                  className="btn btn-secondary"
-                  onClick={handleExportData}
-                  disabled={isExporting}
-                  id="export-data-btn"
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 'var(--text-sm)' }}
-                >
-                  <span>⬇️</span>
-                  <span>{isExporting ? 'Exporting...' : 'Export (JSON)'}</span>
-                </button>
-
-                {/* Import File Picker Trigger */}
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isImporting}
-                  id="import-data-btn"
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 'var(--text-sm)' }}
-                >
-                  <span>⬆️</span>
-                  <span>{isImporting ? 'Importing...' : 'Import (JSON)'}</span>
-                </button>
-
-                {/* Hidden File Input */}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".json,application/json"
-                  onChange={handleFileUpload}
-                  style={{ display: 'none' }}
-                />
-              </div>
-
-              {/* Import Mode Selector */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--bg-muted)', borderRadius: 'var(--radius-md)' }}>
-                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>Import Mode:</span>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button
-                    type="button"
-                    onClick={() => setImportMode('merge')}
-                    style={{
-                      padding: '3px 8px',
-                      borderRadius: 'var(--radius-sm)',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      border: 'none',
-                      cursor: 'pointer',
-                      background: importMode === 'merge' ? 'var(--brand-primary)' : 'transparent',
-                      color: importMode === 'merge' ? 'white' : 'var(--text-secondary)',
-                    }}
-                  >
-                    Merge
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setImportMode('overwrite')}
-                    style={{
-                      padding: '3px 8px',
-                      borderRadius: 'var(--radius-sm)',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      border: 'none',
-                      cursor: 'pointer',
-                      background: importMode === 'overwrite' ? 'var(--status-error)' : 'transparent',
-                      color: importMode === 'overwrite' ? 'white' : 'var(--text-secondary)',
-                    }}
-                  >
-                    Overwrite
-                  </button>
-                </div>
-              </div>
-
-              {/* Feedback Alert */}
-              {backupFeedback && (
-                <div
-                  className="fade-in-up"
-                  style={{
-                    padding: '8px 12px',
-                    borderRadius: 'var(--radius-md)',
-                    fontSize: 'var(--text-xs)',
-                    fontWeight: 600,
-                    background:
-                      backupFeedback.type === 'success'
-                        ? 'rgba(16, 185, 129, 0.15)'
-                        : backupFeedback.type === 'error'
-                        ? 'rgba(239, 68, 68, 0.15)'
-                        : 'rgba(91, 107, 240, 0.15)',
-                    color:
-                      backupFeedback.type === 'success'
-                        ? 'var(--status-success)'
-                        : backupFeedback.type === 'error'
-                        ? 'var(--status-error)'
-                        : 'var(--brand-primary)',
-                  }}
-                >
-                  {backupFeedback.message}
-                </div>
-              )}
-            </div>
-          </div>
+          {/* ── IF API KEY MISSING, SHOW PROMINENTLY AT TOP ─── */}
+          {!apiKeyStatus.hasKey && renderApiKeySection(false)}
 
           {/* ── PROFILE SECTION ─────────────────────────── */}
           <div style={{ marginBottom: 'var(--space-6)' }}>
@@ -696,19 +606,137 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          {/* ── BACKUP, EXPORT & IMPORT DATA ────────────── */}
+          <div style={{ marginBottom: 'var(--space-6)' }}>
+            <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 'var(--space-3)' }}>
+              📦 Data Backup & Portability
+            </div>
+
+            <div className="card fade-in-up" style={{ padding: 'var(--space-4) var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                Export your full SQLite database snapshot (tasks, goals, habits, memories, calendar, expenses) as a JSON file or restore from a backup.
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                {/* Export Button */}
+                <button
+                  className="btn btn-secondary"
+                  onClick={handleExportData}
+                  disabled={isExporting}
+                  id="export-data-btn"
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 'var(--text-sm)' }}
+                >
+                  <span>⬇️</span>
+                  <span>{isExporting ? 'Exporting...' : 'Export (JSON)'}</span>
+                </button>
+
+                {/* Import File Picker Trigger */}
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isImporting}
+                  id="import-data-btn"
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 'var(--text-sm)' }}
+                >
+                  <span>⬆️</span>
+                  <span>{isImporting ? 'Importing...' : 'Import (JSON)'}</span>
+                </button>
+
+                {/* Hidden File Input */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json,application/json"
+                  onChange={handleFileUpload}
+                  style={{ display: 'none' }}
+                />
+              </div>
+
+              {/* Import Mode Selector */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--bg-muted)', borderRadius: 'var(--radius-md)' }}>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>Import Mode:</span>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    type="button"
+                    onClick={() => setImportMode('merge')}
+                    style={{
+                      padding: '3px 8px',
+                      borderRadius: 'var(--radius-sm)',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: importMode === 'merge' ? 'var(--brand-primary)' : 'transparent',
+                      color: importMode === 'merge' ? 'white' : 'var(--text-secondary)',
+                    }}
+                  >
+                    Merge
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setImportMode('overwrite')}
+                    style={{
+                      padding: '3px 8px',
+                      borderRadius: 'var(--radius-sm)',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: importMode === 'overwrite' ? 'var(--status-error)' : 'transparent',
+                      color: importMode === 'overwrite' ? 'white' : 'var(--text-secondary)',
+                    }}
+                  >
+                    Overwrite
+                  </button>
+                </div>
+              </div>
+
+              {/* Feedback Alert */}
+              {backupFeedback && (
+                <div
+                  className="fade-in-up"
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    fontSize: 'var(--text-xs)',
+                    fontWeight: 600,
+                    background:
+                      backupFeedback.type === 'success'
+                        ? 'rgba(16, 185, 129, 0.15)'
+                        : backupFeedback.type === 'error'
+                        ? 'rgba(239, 68, 68, 0.15)'
+                        : 'rgba(91, 107, 240, 0.15)',
+                    color:
+                      backupFeedback.type === 'success'
+                        ? 'var(--status-success)'
+                        : backupFeedback.type === 'error'
+                        ? 'var(--status-error)'
+                        : 'var(--brand-primary)',
+                  }}
+                >
+                  {backupFeedback.message}
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* ── SAVE ACTION ─────────────────────────── */}
           <button
             id="settings-save-btn"
             className="btn btn-primary btn-full"
             onClick={saveSettings}
             disabled={saving}
-            style={{ marginBottom: 'var(--space-4)' }}
+            style={{ marginBottom: 'var(--space-6)' }}
           >
             {saving ? 'Saving...' : saved ? '✓ Saved Successfully' : 'Save Settings'}
           </button>
 
+          {/* ── ONCE ADDED, API KEY OPTION IS AT THE BOTTOM WITH REDUCED OPACITY ── */}
+          {apiKeyStatus.hasKey && renderApiKeySection(true)}
+
           {/* ── DANGER ZONE (RESET DATA) ────────────── */}
-          <div style={{ marginTop: 'var(--space-6)', marginBottom: 'var(--space-8)' }}>
+          <div style={{ marginTop: 'var(--space-4)', marginBottom: 'var(--space-8)' }}>
             <div className="card" style={{ padding: 'var(--space-4) var(--space-5)', border: '1px solid var(--priority-critical-border)', background: 'var(--priority-critical-bg)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>

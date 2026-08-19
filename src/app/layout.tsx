@@ -22,6 +22,8 @@ export const viewport: Viewport = {
   themeColor: '#5B6BF0',
 }
 
+import AndroidGestureBack from '@/components/layout/AndroidGestureBack'
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
@@ -33,7 +35,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <AndroidGestureBack />
+        {children}
+      </body>
     </html>
   )
 }
