@@ -1,0 +1,447 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+
+// ─── USER & AUTH ───────────────────────────────────────────────────────────────
+
+model User {
+  id          String   @id @default(cuid())
+  name        String   @default("User")
+  pin         String?  // hashed PIN for local auth
+  timezone    String   @default("Asia/Kolkata")
+  avatar      String?
+  setupDone   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  preferences   Preference[]
+  tasks         Task[]
+  events        Event[]
+  goals         Goal[]
+  habits        Habit[]
+  reminders     Reminder[]
+  memories      Memory[]
+  conversations Conversation[]
+  agentActions  AgentAction[]
+  notifications Notification[]
+  productivityRecords ProductivityRecord[]
+  behaviorPatterns    BehaviorPattern[]
+  studySessions       StudySession[]
+  documents    Document[]
+  expenses     Expense[]
+}
+
+// ─── TASKS ─────────────────────────────────────────────────────────────────────
+
+model Task {
+  id              String      @id @default(cuid())
+  userId          String
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title           String
+  description     String?
+  category        String?     // work, personal, study, health, finance, etc.
+  priority        String      @default("medium") // critical, high, medium, low
+  status          String      @default("planned") // planned, scheduled, in_progress, completed, skipped, cancelled, overdue, rescheduled
+  
+  deadline        DateTime?
+  scheduledStart  DateTime?
+  scheduledEnd    DateTime?
+  estimatedMinutes Int?
+  actualMinutes   Int?
+  
+  parentId        String?
+  parent          Task?       @relation("TaskHierarchy", fields: [parentId], references: [id])
+  subtasks        Task[]      @relation("TaskHierarchy")
+  
+  goalId          String?
+  goal            Goal?       @relation(fields: [goalId], references: [id])
+  
+  milestoneId     String?
+  milestone       Milestone?  @relation(fields: [milestoneId], references: [id])
+
+  recurringRule   String?     // cron-like string or JSON
+  isRecurring     Boolean     @default(false)
+  
+  isAiGenerated   Boolean     @default(false)
+  aiReason        String?     // why AI created/modified this
+  
+  postponeCount   Int         @default(0)
+  lastPostponedAt DateTime?
+  
+  completedAt     DateTime?
+  
+  notes           String?
+  tags            String?     // comma-separated
+  
+  reminders       Reminder[]
+  dependencies    TaskDependency[] @relation("DependentTask")
+  dependents      TaskDependency[] @relation("RequiredTask")
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model TaskDependency {
+  id            String @id @default(cuid())
+  dependentId   String
+  requiredId    String
+  dependent     Task   @relation("DependentTask", fields: [dependentId], references: [id], onDelete: Cascade)
+  required      Task   @relation("RequiredTask", fields: [requiredId], references: [id], onDelete: Cascade)
+}
+
+// ─── EVENTS ───────────────────────────────────────────────────────────────────
+
+model Event {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String?
+  location    String?
+  type        String   @default("event") // event, class, meeting, appointment, etc.
+
+  startTime   DateTime
+  endTime     DateTime
+  allDay      Boolean  @default(false)
+
+  isRecurring Boolean  @default(false)
+  recurringRule String?
+
+  color       String?
+  isAiGenerated Boolean @default(false)
+  
+  reminders   Reminder[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── SCHEDULE BLOCKS ──────────────────────────────────────────────────────────
+
+model ScheduleBlock {
+  id        String   @id @default(cuid())
+  userId    String
+  date      String   // YYYY-MM-DD
+  startTime String   // HH:mm
+  endTime   String   // HH:mm
+  type      String   // free, busy, focus, break, sleep
+  label     String?
+  createdAt DateTime @default(now())
+}
+
+// ─── GOALS ────────────────────────────────────────────────────────────────────
+
+model Goal {
+  id          String      @id @default(cuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String?
+  category    String?     // career, health, learning, finance, personal, etc.
+  status      String      @default("active") // active, paused, completed, abandoned
+  priority    String      @default("high")
+
+  targetDate  DateTime?
+  completedAt DateTime?
+  progress    Float       @default(0) // 0-100
+
+  isAiGenerated Boolean   @default(false)
+
+  milestones  Milestone[]
+  tasks       Task[]
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model Milestone {
+  id          String   @id @default(cuid())
+  goalId      String
+  goal        Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String?
+  status      String   @default("pending") // pending, completed
+  targetDate  DateTime?
+  completedAt DateTime?
+
+  tasks       Task[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── HABITS ───────────────────────────────────────────────────────────────────
+
+model Habit {
+  id          String      @id @default(cuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String?
+  category    String?
+  frequency   String      @default("daily") // daily, weekdays, weekends, custom
+  scheduledTime String?   // HH:mm
+  estimatedMinutes Int    @default(30)
+  color       String?
+
+  currentStreak  Int      @default(0)
+  longestStreak  Int      @default(0)
+  totalCompleted Int      @default(0)
+  
+  isActive    Boolean     @default(true)
+  logs        HabitLog[]
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model HabitLog {
+  id          String   @id @default(cuid())
+  habitId     String
+  habit       Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  date        String   // YYYY-MM-DD
+  status      String   // completed, skipped, missed
+  notes       String?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  @@unique([habitId, date])
+}
+
+
+// ─── STUDY SESSIONS ───────────────────────────────────────────────────────────
+
+model StudySession {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  subject     String
+  topic       String?
+  deadlineId  String?
+  taskId      String?
+
+  scheduledStart DateTime
+  scheduledEnd   DateTime
+  actualStart    DateTime?
+  actualEnd      DateTime?
+
+  status      String   @default("scheduled") // scheduled, in_progress, completed, missed
+  notes       String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── REMINDERS ────────────────────────────────────────────────────────────────
+
+model Reminder {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title       String
+  body        String?
+  type        String   @default("reminder") // reminder, follow_up, accountability
+  triggerAt   DateTime
+  status      String   @default("pending") // pending, sent, dismissed, snoozed
+  snoozedTo   DateTime?
+
+  taskId      String?
+  task        Task?    @relation(fields: [taskId], references: [id])
+  eventId     String?
+  event       Event?   @relation(fields: [eventId], references: [id])
+
+  isAiGenerated Boolean @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── MEMORY ───────────────────────────────────────────────────────────────────
+
+model Memory {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  content     String
+  category    String?  // goal, preference, commitment, fact, pattern, decision
+  importance  String   @default("medium") // low, medium, high, critical
+  tags        String?  // comma-separated
+  source      String?  // chat, system, user
+
+  lastAccessedAt DateTime?
+  accessCount    Int      @default(0)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── CONVERSATIONS & MESSAGES ─────────────────────────────────────────────────
+
+model Conversation {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String?
+  messages  Message[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String       // user, assistant, tool
+  content        String
+  toolCalls      String?      // JSON array of tool calls
+  toolResults    String?      // JSON array of tool results
+  metadata       String?      // JSON for extra data (agent used, actions taken)
+  createdAt      DateTime     @default(now())
+}
+
+// ─── AGENT ACTIONS ────────────────────────────────────────────────────────────
+
+model AgentAction {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  agentName   String   // schedule_agent, task_agent, etc.
+  actionType  String   // createTask, moveEvent, createReminder, etc.
+  description String
+  payload     String?  // JSON
+  result      String?  // JSON
+  status      String   @default("completed") // pending, completed, failed, undone
+
+  undoPayload String?  // JSON to undo this action
+  canUndo     Boolean  @default(false)
+  undoneAt    DateTime?
+
+  createdAt   DateTime @default(now())
+}
+
+// ─── NOTIFICATIONS ────────────────────────────────────────────────────────────
+
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title       String
+  body        String?
+  type        String   // info, warning, critical, reminder, accountability, approval
+  status      String   @default("unread") // unread, read, dismissed, actioned
+  
+  actionType  String?  // start_now, reschedule, skip, approve, reject
+  actionData  String?  // JSON payload for actions
+  
+  relatedTaskId  String?
+  relatedEventId String?
+  
+  scheduledFor DateTime?
+  readAt       DateTime?
+
+  createdAt   DateTime @default(now())
+}
+
+// ─── PRODUCTIVITY RECORDS ─────────────────────────────────────────────────────
+
+model ProductivityRecord {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  date        String   // YYYY-MM-DD
+  plannedTasks Int     @default(0)
+  completedTasks Int   @default(0)
+  skippedTasks Int     @default(0)
+  missedTasks Int      @default(0)
+  rescheduledTasks Int @default(0)
+  totalPlannedMinutes Int @default(0)
+  totalActualMinutes  Int @default(0)
+  completionRate Float @default(0)
+  scheduleAdherence Float @default(0)
+  score       Float   @default(0) // 0-100
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, date])
+}
+
+// ─── BEHAVIOR PATTERNS ────────────────────────────────────────────────────────
+
+model BehaviorPattern {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  patternType String   // postponement, duration_underestimate, peak_hours, category_avoidance
+  category    String?
+  description String
+  data        String   // JSON with pattern details
+  confidence  Float    @default(0.5) // 0-1
+  sampleSize  Int      @default(1)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── PREFERENCES ──────────────────────────────────────────────────────────────
+
+model Preference {
+  id      String @id @default(cuid())
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key     String
+  value   String
+
+  @@unique([userId, key])
+}
+
+// ─── DOCUMENTS ────────────────────────────────────────────────────────────────
+
+model Document {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title       String
+  type        String?  // id, certificate, license, prescription, etc.
+  expiryDate  DateTime?
+  renewalDate DateTime?
+  notes       String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── EXPENSES ─────────────────────────────────────────────────────────────────
+
+model Expense {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title       String
+  amount      Float?
+  dueDate     DateTime?
+  category    String?
+  status      String   @default("pending") // pending, paid, overdue
+  notes       String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
