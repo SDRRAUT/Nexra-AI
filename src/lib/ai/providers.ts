@@ -1,26 +1,40 @@
-import { google } from '@ai-sdk/google'
+import { google, createGoogleGenerativeAI } from '@ai-sdk/google'
 
 // ─── AI PROVIDER ABSTRACTION ───────────────────────────────────────────────────
-// Centralizes all AI model configuration. Swap providers here without touching agents.
+// Configured with Google Gemini Flash & Pro tiers, supporting runtime local API keys
 
 export type ModelTier = 'fast' | 'balanced' | 'powerful'
 
 /**
- * Get the appropriate Gemini model based on task complexity tier.
+ * Returns the Google AI provider using the current runtime key if set
  */
-export function getModel(tier: ModelTier = 'balanced') {
+export function getGoogleProvider(apiKey?: string) {
+  const key = apiKey || process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY
+  if (key) {
+    return createGoogleGenerativeAI({ apiKey: key })
+  }
+  return google
+}
+
+/**
+ * Get the appropriate Gemini model based on task complexity tier.
+ * - 'fast' / 'balanced': Ultra-fast Gemini Flash (gemini-3.6-flash)
+ * - 'powerful': High-reasoning Gemini Pro (gemini-3.1-pro-preview / gemini-3.6-flash)
+ */
+export function getModel(tier: ModelTier = 'fast', customApiKey?: string) {
+  const provider = getGoogleProvider(customApiKey)
+
   switch (tier) {
-    case 'fast':
-      return google('gemini-3.6-flash')
     case 'powerful':
-      return google('gemini-3.6-flash')
+      return provider('gemini-3.1-pro-preview')
+    case 'fast':
     case 'balanced':
     default:
-      return google('gemini-3.6-flash')
+      return provider('gemini-3.6-flash')
   }
 }
 
-// Export the default model for convenience
-export const defaultModel = getModel('balanced')
+// Export default models for convenience
+export const defaultModel = getModel('fast')
 export const fastModel = getModel('fast')
 export const powerfulModel = getModel('powerful')

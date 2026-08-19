@@ -37,9 +37,11 @@ export default function MemoryPage() {
 
   useEffect(() => { fetchMemories() }, [])
 
-  const deleteMemory = async (id: string) => {
-    await fetch('/api/memory', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
-    fetchMemories()
+  const deleteMemory = async (id: string, content: string) => {
+    if (confirm(`⚠️ Are you sure you want to permanently delete this memory:\n"${content.slice(0, 50)}..."?`)) {
+      await fetch('/api/memory', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+      fetchMemories()
+    }
   }
 
   const addMemory = async () => {
@@ -118,7 +120,7 @@ export default function MemoryPage() {
                       </div>
                     </div>
                     <button
-                      onClick={() => deleteMemory(memory.id)}
+                      onClick={() => deleteMemory(memory.id, memory.content)}
                       style={{ color: 'var(--text-tertiary)', fontSize: 18, padding: 4, flexShrink: 0 }}
                       id={`delete-memory-${memory.id}`}
                     >

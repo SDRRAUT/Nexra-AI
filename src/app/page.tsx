@@ -123,10 +123,12 @@ export default function HomePage() {
     fetchDashboard()
   }
 
-  const handleDeleteTask = async (id: string, e: React.MouseEvent) => {
+  const handleDeleteTask = async (id: string, title: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    await fetch(`/api/tasks/${id}`, { method: 'DELETE' })
-    fetchDashboard()
+    if (confirm(`⚠️ Are you sure you want to delete task "${title}"?`)) {
+      await fetch(`/api/tasks/${id}`, { method: 'DELETE' })
+      fetchDashboard()
+    }
   }
 
   const handleAddTask = async () => {
@@ -233,7 +235,7 @@ export default function HomePage() {
           </div>
         </div>
         <button
-          onClick={(e) => handleDeleteTask(task.id, e)}
+          onClick={(e) => handleDeleteTask(task.id, task.title, e)}
           style={{
             background: 'transparent',
             border: 'none',

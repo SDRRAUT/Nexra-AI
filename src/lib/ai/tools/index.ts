@@ -52,6 +52,19 @@ export const createTaskTool = tool({
         status: params.scheduledStart ? 'scheduled' : 'planned',
       },
     })
+
+    // Log to Agent Action table
+    await prisma.agentAction.create({
+      data: {
+        userId: DEFAULT_USER_ID,
+        agentName: params.category === 'study' ? 'study_agent' : 'task_agent',
+        actionType: 'createTask',
+        description: `Created task "${task.title}" [${task.priority}]${params.scheduledStart ? ` scheduled at ${params.scheduledStart}` : ''}`,
+        canUndo: true,
+        undoPayload: JSON.stringify({ taskId: task.id }),
+      },
+    }).catch(() => {})
+
     return { success: true, taskId: task.id, task: { id: task.id, title: task.title, status: task.status } }
   },
 })
@@ -385,13 +398,11 @@ export const getGoalsTool = tool({
   },
 })
 
-// ─── MEMORY TOOLS ─────────────────────────────────────────────────────────────
-
 export const saveMemoryTool = tool({
-  description: 'Save important information about the user to long-term memory. Use for goals, commitments, preferences, important dates, life context.',
+  description: 'Save any information about the user to long-term memory — small details (coffee preferences, waking time, study music, likes/dislikes, friends/family names) to big commitments (exams, major goals, life decisions, deadlines). Call this proactively whenever user mentions personal context.',
   inputSchema: z.object({
     content: z.string().describe('What to remember — be specific and complete'),
-    category: z.string().optional().describe('goal, preference, commitment, fact, pattern, decision, deadline'),
+    category: z.string().optional().describe('goal, preference, commitment, fact, habit, relationship, decision, deadline'),
     importance: z.enum(['low', 'medium', 'high', 'critical']).default('medium'),
     tags: z.string().optional().describe('Comma-separated tags for retrieval'),
   }),
@@ -405,12 +416,25 @@ export const saveMemoryTool = tool({
       data: {
         userId: DEFAULT_USER_ID,
         content: params.content,
-        category: params.category,
+        category: params.category || 'fact',
         importance: params.importance,
         tags: params.tags,
         source: 'chat',
       },
     })
+
+    // Log to Agent Action table
+    await prisma.agentAction.create({
+      data: {
+        userId: DEFAULT_USER_ID,
+        agentName: 'memory_agent',
+        actionType: 'saveMemory',
+        description: `Stored memory [${params.category || 'fact'}]: "${params.content.slice(0, 50)}..."`,
+        canUndo: true,
+        undoPayload: JSON.stringify({ memoryId: memory.id }),
+      },
+    }).catch(() => {})
+
     return { success: true, memoryId: memory.id }
   },
 })
@@ -442,6 +466,23 @@ export const getMemoryTool = tool({
     }
     
     return { memories: memories.map((m: any) => ({ id: m.id, content: m.content, category: m.category, importance: m.importance, createdAt: m.createdAt })) }
+  },
+})
+
+export const deleteMemoryTool = tool({
+  description: 'Permanently delete a specific memory from memory vault. MUST only be used AFTER the user has explicitly confirmed deletion.',
+  inputSchema: z.object({
+    memoryId: z.string().describe('The ID of the memory to delete'),
+    userConfirmed: z.boolean().describe('Set to true only if the user explicitly typed yes or confirmed deletion'),
+  }),
+  execute: async (params: { memoryId: string; userConfirmed: boolean }) => {
+    if (!params.userConfirmed) {
+      return { success: false, error: 'User confirmation is required before deleting any memory.' }
+    }
+    await prisma.memory.delete({
+      where: { id: params.memoryId },
+    })
+    return { success: true, message: 'Memory permanently deleted.' }
   },
 })
 
@@ -624,6 +665,7 @@ export const allTools = {
   getGoals: getGoalsTool,
   saveMemory: saveMemoryTool,
   getMemory: getMemoryTool,
+  deleteMemory: deleteMemoryTool,
   createNotification: createNotificationTool,
   getProductivity: getProductivityTool,
   createEvent: createEventTool,
