@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import AppHeader from '@/components/layout/AppHeader'
 import BottomNav from '@/components/layout/BottomNav'
 import { useRouter } from 'next/navigation'
+import { localDb } from '@/lib/db/localDb'
 
 interface Settings {
   name: string
@@ -60,33 +61,33 @@ export default function SettingsPage() {
   const [importMode, setImportMode] = useState<'merge' | 'overwrite'>('merge')
   const [backupFeedback, setBackupFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
 
-  const fetchApiKeyStatus = () => {
-    fetch('/api/settings/apikey')
-      .then(r => r.json())
-      .then(d => {
-        if (d) {
-          setApiKeyStatus({
-            hasKey: Boolean(d.hasKey),
-            maskedKey: d.maskedKey || '',
-          })
-        }
-      })
-      .catch(() => {})
+  const fetchApiKeyStatus = async () => {
+    let key = ''
+    try {
+      const pref = await localDb.preferences.get('gemini_api_key')
+      key = pref?.value || ''
+    } catch {}
+    if (!key && typeof localStorage !== 'undefined') {
+      key = localStorage.getItem('srushti_gemini_api_key') || ''
+    }
+    setApiKeyStatus({
+      hasKey: Boolean(key),
+      maskedKey: key ? `${key.slice(0, 6)}...${key.slice(-4)}` : '',
+    })
   }
 
   useEffect(() => {
-    fetch('/api/user')
-      .then(r => r.json())
-      .then(data => {
-        if (data) {
-          setSettings(prev => ({
-            ...prev,
-            name: data.name || 'User',
-            timezone: data.timezone || 'Asia/Kolkata',
-          }))
-        }
-      })
-      .catch(() => {})
+    // Load local user settings
+    localDb.user.toArray().then((users: any[]) => {
+      if (users && users.length > 0) {
+        const u = users[0]
+        setSettings(prev => ({
+          ...prev,
+          name: u.name || 'User',
+          timezone: u.timezone || 'Asia/Kolkata',
+        }))
+      }
+    }).catch(() => {})
 
     fetchApiKeyStatus()
   }, [])
@@ -94,14 +95,15 @@ export default function SettingsPage() {
   const saveSettings = async () => {
     setSaving(true)
     try {
-      await fetch('/api/user', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: settings.name,
-          timezone: settings.timezone,
-        }),
-      })
+      await localDb.user.put({
+        id: 'default-user',
+        name: settings.name,
+        timezone: settings.timezone,
+        aiAutonomy: settings.aiAutonomy,
+        notifications: settings.notifications,
+        morningBriefing: settings.morningBriefing,
+        accountabilityCheck: settings.accountabilityCheck,
+      }).catch(() => {})
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
     } catch {
@@ -111,7 +113,8 @@ export default function SettingsPage() {
   }
 
   const handleSaveApiKey = async () => {
-    if (!apiKeyInput.trim()) {
+    const key = apiKeyInput.trim()
+    if (!key) {
       setKeyFeedback({ type: 'error', message: 'Please enter a valid Gemini API key.' })
       return
     }
@@ -120,24 +123,32 @@ export default function SettingsPage() {
     setKeyFeedback({ type: 'info', message: 'Validating key with Google Gemini...' })
 
     try {
-      const res = await fetch('/api/settings/apikey', {
+      // Direct client validation against Google Gemini endpoint
+      const testRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey: apiKeyInput.trim() }),
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: 'ping' }] }]
+        })
       })
-      const data = await res.json()
 
-      if (res.ok && data.success) {
-        setKeyFeedback({ type: 'success', message: '✅ API key verified & saved locally in your database!' })
+      if (testRes.ok) {
+        await localDb.preferences.put({ key: 'gemini_api_key', value: key }).catch(() => {})
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('srushti_gemini_api_key', key)
+        }
+        setKeyFeedback({ type: 'success', message: '✅ API key verified & saved locally on your phone!' })
         setApiKeyInput('')
         setShowEditKey(false)
-        fetchApiKeyStatus()
+        await fetchApiKeyStatus()
         setTimeout(() => setKeyFeedback(null), 4000)
       } else {
-        setKeyFeedback({ type: 'error', message: data.error || 'Failed to validate API key.' })
+        const errData = await testRes.json().catch(() => null)
+        const errMsg = errData?.error?.message || 'Invalid API key or network error.'
+        setKeyFeedback({ type: 'error', message: `Validation failed: ${errMsg}` })
       }
     } catch (err: any) {
-      setKeyFeedback({ type: 'error', message: err.message || 'Error communicating with server.' })
+      setKeyFeedback({ type: 'error', message: err.message || 'Error communicating with Gemini.' })
     } finally {
       setIsSavingKey(false)
     }
@@ -148,17 +159,28 @@ export default function SettingsPage() {
     setKeyFeedback({ type: 'info', message: 'Testing connection to Gemini 3.6 Flash...' })
 
     try {
-      const res = await fetch('/api/settings/apikey', {
+      let key = apiKeyInput.trim()
+      if (!key) {
+        const pref = await localDb.preferences.get('gemini_api_key')
+        key = pref?.value || (typeof localStorage !== 'undefined' ? localStorage.getItem('srushti_gemini_api_key') || '' : '')
+      }
+      if (!key) {
+        setKeyFeedback({ type: 'error', message: 'No API key configured.' })
+        return
+      }
+
+      const testRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ testOnly: true, apiKey: apiKeyInput.trim() || undefined }),
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: 'hello' }] }]
+        })
       })
-      const data = await res.json()
 
-      if (res.ok && data.success) {
-        setKeyFeedback({ type: 'success', message: '⚡ Connection successful! Gemini 3.6 Flash is active.' })
+      if (testRes.ok) {
+        setKeyFeedback({ type: 'success', message: '⚡ Connection successful! Gemini is active.' })
       } else {
-        setKeyFeedback({ type: 'error', message: data.error || 'Connection test failed.' })
+        setKeyFeedback({ type: 'error', message: 'Connection test failed. Check your API key.' })
       }
     } catch (err: any) {
       setKeyFeedback({ type: 'error', message: err.message || 'Test failed.' })
@@ -169,9 +191,12 @@ export default function SettingsPage() {
 
   const handleRemoveApiKey = async () => {
     if (confirm('Are you sure you want to remove your local Gemini API key?')) {
-      await fetch('/api/settings/apikey', { method: 'DELETE' })
+      await localDb.preferences.delete('gemini_api_key').catch(() => {})
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('srushti_gemini_api_key')
+      }
       setKeyFeedback({ type: 'info', message: 'API key removed.' })
-      fetchApiKeyStatus()
+      await fetchApiKeyStatus()
       setShowEditKey(false)
       setTimeout(() => setKeyFeedback(null), 3000)
     }

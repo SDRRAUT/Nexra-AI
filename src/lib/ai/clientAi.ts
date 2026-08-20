@@ -14,12 +14,18 @@ export async function streamClientChat(
   messages: { role: string; content: string }[],
   callbacks: ClientAICallback
 ) {
-  // 1. Get API key from local DB preferences
-  const keyPref = await localDb.preferences.get('gemini_api_key')
-  const apiKey = keyPref?.value || ''
+  // 1. Get API key from local DB preferences or localStorage
+  let apiKey = ''
+  try {
+    const keyPref = await localDb.preferences.get('gemini_api_key')
+    apiKey = keyPref?.value || ''
+  } catch {}
+  if (!apiKey && typeof localStorage !== 'undefined') {
+    apiKey = localStorage.getItem('srushti_gemini_api_key') || ''
+  }
 
   if (!apiKey) {
-    throw new Error('Google Gemini API key is missing. Please add your key in Settings.')
+    throw new Error('Google Gemini API key is missing. Please go to Settings and enter your key.')
   }
 
   // 2. Build local context summary from IndexedDB
