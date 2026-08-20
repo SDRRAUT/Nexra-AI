@@ -35,11 +35,19 @@ export async function getClientDashboard(): Promise<DashboardData> {
     localDb.events.toArray(),
   ])
 
+  let customName = ''
+  if (typeof localStorage !== 'undefined') {
+    customName = localStorage.getItem('srushti_user_name') || ''
+  }
+
   const user = userList[0] || {
     id: 'default-user',
-    name: 'Sanket',
+    name: customName || 'Sanket',
     timezone: 'Asia/Kolkata',
     aiAutonomy: 'autonomous',
+  }
+  if (customName) {
+    user.name = customName
   }
 
   const todayTasks = tasks.filter(t => t.status !== 'cancelled')

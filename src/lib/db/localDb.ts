@@ -181,7 +181,7 @@ export async function ensureInitialData() {
     // 1. Seed default user
     await localDb.user.add({
       id: 'default-user',
-      name: 'Raut',
+      name: 'Sanket',
       timezone: 'Asia/Kolkata',
       aiAutonomy: 'autonomous',
       notifications: true,

@@ -62,18 +62,33 @@ RULES:
     })),
   ]
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents }),
-    }
-  )
+  const candidateModels = ['gemini-3.6-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']
+  let response: Response | null = null
+  let lastErr = ''
 
-  if (!response.ok) {
-    const errText = await response.text()
-    throw new Error(`Gemini API error: ${response.status} - ${errText}`)
+  for (const model of candidateModels) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents }),
+        }
+      )
+      if (res.ok) {
+        response = res
+        break
+      } else {
+        lastErr = await res.text()
+      }
+    } catch (e: any) {
+      lastErr = e.message || 'Network error'
+    }
+  }
+
+  if (!response || !response.ok) {
+    throw new Error(`Gemini API error: ${lastErr || 'Failed to connect'}`)
   }
 
   const reader = response.body?.getReader()

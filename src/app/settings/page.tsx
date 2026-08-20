@@ -79,14 +79,25 @@ export default function SettingsPage() {
   useEffect(() => {
     // Load local user settings
     localDb.user.toArray().then((users: any[]) => {
+      let savedName = ''
+      let savedTz = ''
       if (users && users.length > 0) {
         const u = users[0]
-        setSettings(prev => ({
-          ...prev,
-          name: u.name || 'User',
-          timezone: u.timezone || 'Asia/Kolkata',
-        }))
+        savedName = u.name
+        savedTz = u.timezone
       }
+      if (!savedName && typeof localStorage !== 'undefined') {
+        savedName = localStorage.getItem('srushti_user_name') || ''
+      }
+      if (!savedTz && typeof localStorage !== 'undefined') {
+        savedTz = localStorage.getItem('srushti_user_timezone') || ''
+      }
+
+      setSettings(prev => ({
+        ...prev,
+        name: savedName || 'Sanket',
+        timezone: savedTz || 'Asia/Kolkata',
+      }))
     }).catch(() => {})
 
     fetchApiKeyStatus()
@@ -97,19 +108,50 @@ export default function SettingsPage() {
     try {
       await localDb.user.put({
         id: 'default-user',
-        name: settings.name,
-        timezone: settings.timezone,
+        name: settings.name || 'Sanket',
+        timezone: settings.timezone || 'Asia/Kolkata',
         aiAutonomy: settings.aiAutonomy,
         notifications: settings.notifications,
         morningBriefing: settings.morningBriefing,
         accountabilityCheck: settings.accountabilityCheck,
       }).catch(() => {})
+
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('srushti_user_name', settings.name || 'Sanket')
+        localStorage.setItem('srushti_user_timezone', settings.timezone || 'Asia/Kolkata')
+      }
+
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
     } catch {
     } finally {
       setSaving(false)
     }
+  }
+
+  const testGeminiKey = async (key: string) => {
+    const candidateModels = ['gemini-3.6-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']
+    let lastError = ''
+    for (const model of candidateModels) {
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: 'ping' }] }]
+          })
+        })
+        if (res.ok) {
+          return { success: true, model }
+        } else {
+          const errData = await res.json().catch(() => null)
+          lastError = errData?.error?.message || `HTTP ${res.status}`
+        }
+      } catch (e: any) {
+        lastError = e.message || 'Network error'
+      }
+    }
+    return { success: false, error: lastError }
   }
 
   const handleSaveApiKey = async () => {
@@ -120,19 +162,12 @@ export default function SettingsPage() {
     }
 
     setIsSavingKey(true)
-    setKeyFeedback({ type: 'info', message: 'Validating key with Google Gemini...' })
+    setKeyFeedback({ type: 'info', message: 'Validating key with Google Gemini 3.6 Flash...' })
 
     try {
-      // Direct client validation against Google Gemini endpoint
-      const testRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: 'ping' }] }]
-        })
-      })
+      const result = await testGeminiKey(key)
 
-      if (testRes.ok) {
+      if (result.success) {
         await localDb.preferences.put({ key: 'gemini_api_key', value: key }).catch(() => {})
         if (typeof localStorage !== 'undefined') {
           localStorage.setItem('srushti_gemini_api_key', key)
@@ -143,9 +178,7 @@ export default function SettingsPage() {
         await fetchApiKeyStatus()
         setTimeout(() => setKeyFeedback(null), 4000)
       } else {
-        const errData = await testRes.json().catch(() => null)
-        const errMsg = errData?.error?.message || 'Invalid API key or network error.'
-        setKeyFeedback({ type: 'error', message: `Validation failed: ${errMsg}` })
+        setKeyFeedback({ type: 'error', message: `Validation failed: ${result.error}` })
       }
     } catch (err: any) {
       setKeyFeedback({ type: 'error', message: err.message || 'Error communicating with Gemini.' })
@@ -169,18 +202,12 @@ export default function SettingsPage() {
         return
       }
 
-      const testRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: 'hello' }] }]
-        })
-      })
+      const result = await testGeminiKey(key)
 
-      if (testRes.ok) {
-        setKeyFeedback({ type: 'success', message: '⚡ Connection successful! Gemini is active.' })
+      if (result.success) {
+        setKeyFeedback({ type: 'success', message: `⚡ Connection successful! ${result.model} is active.` })
       } else {
-        setKeyFeedback({ type: 'error', message: 'Connection test failed. Check your API key.' })
+        setKeyFeedback({ type: 'error', message: `Connection test failed: ${result.error}` })
       }
     } catch (err: any) {
       setKeyFeedback({ type: 'error', message: err.message || 'Test failed.' })
