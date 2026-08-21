@@ -86,6 +86,11 @@ export default function GoalsPage() {
 
   useEffect(() => {
     fetchGoals()
+    const handleDataChanged = () => {
+      fetchGoals()
+    }
+    window.addEventListener('srushti_data_changed', handleDataChanged)
+    return () => window.removeEventListener('srushti_data_changed', handleDataChanged)
   }, [])
 
   const addGoal = async () => {

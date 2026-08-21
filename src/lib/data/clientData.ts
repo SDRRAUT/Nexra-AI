@@ -142,6 +142,27 @@ export async function getClientHabits(): Promise<LocalHabit[]> {
   return localDb.habits.toArray()
 }
 
+export async function createClientHabit(habit: Partial<LocalHabit>): Promise<LocalHabit> {
+  const newHabit: LocalHabit = {
+    id: 'habit-' + Date.now(),
+    title: habit.title || 'New Habit',
+    category: habit.category || 'productivity',
+    frequency: habit.frequency || 'daily',
+    scheduledTime: habit.scheduledTime || '08:30',
+    currentStreak: 0,
+    longestStreak: 0,
+    totalCompleted: 0,
+    createdAt: new Date().toISOString(),
+    ...habit,
+  }
+  await localDb.habits.add(newHabit)
+  return newHabit
+}
+
+export async function deleteClientHabit(id: string): Promise<void> {
+  await localDb.habits.delete(id)
+}
+
 export async function toggleClientHabit(id: string, completed: boolean): Promise<void> {
   const habit = await localDb.habits.get(id)
   if (!habit) return

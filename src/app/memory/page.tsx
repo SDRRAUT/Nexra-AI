@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import AppHeader from '@/components/layout/AppHeader'
 import BottomNav from '@/components/layout/BottomNav'
 import { format } from 'date-fns'
+import { localDb, type LocalMemory } from '@/lib/db/localDb'
 
 interface Memory {
   id: string; content: string; category?: string; importance: string; tags?: string; createdAt: string; accessCount: number
@@ -29,24 +30,48 @@ export default function MemoryPage() {
 
   const fetchMemories = async () => {
     try {
-      const res = await fetch('/api/memory')
-      const data = await res.json()
-      setMemories(data)
+      // 1. Try local offline data first
+      const localMems = await localDb.memories.toArray()
+      if (localMems) {
+        setMemories(localMems as any)
+      }
+
+      // 2. Also try API if server is running
+      const res = await fetch('/api/memory').then(r => r.json()).catch(() => null)
+      if (Array.isArray(res)) setMemories(res)
     } catch (e) { } finally { setLoading(false) }
   }
 
-  useEffect(() => { fetchMemories() }, [])
+  useEffect(() => {
+    fetchMemories()
+    const handleDataChanged = () => {
+      fetchMemories()
+    }
+    window.addEventListener('srushti_data_changed', handleDataChanged)
+    return () => window.removeEventListener('srushti_data_changed', handleDataChanged)
+  }, [])
 
   const deleteMemory = async (id: string, content: string) => {
     if (confirm(`⚠️ Are you sure you want to permanently delete this memory:\n"${content.slice(0, 50)}..."?`)) {
-      await fetch('/api/memory', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+      await localDb.memories.delete(id).catch(() => {})
+      await fetch('/api/memory', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) }).catch(() => {})
       fetchMemories()
     }
   }
 
   const addMemory = async () => {
     if (!newMemory.content.trim()) return
-    await fetch('/api/memory', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newMemory) })
+    const memId = 'mem-' + Date.now()
+    await localDb.memories.add({
+      id: memId,
+      content: newMemory.content,
+      category: newMemory.category,
+      importance: newMemory.importance,
+      accessCount: 1,
+      createdAt: new Date().toISOString(),
+    }).catch(() => {})
+
+    await fetch('/api/memory', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newMemory) }).catch(() => {})
     setNewMemory({ content: '', category: 'fact', importance: 'medium' })
     setShowAdd(false)
     fetchMemories()

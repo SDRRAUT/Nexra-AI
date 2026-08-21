@@ -83,12 +83,14 @@ const PlusIcon = () => (
 )
 
 import { getClientDashboard, updateClientTask, deleteClientTask, createClientTask, type DashboardData as LocalDashData } from '@/lib/data/clientData'
+import OnboardingWizard from '@/components/onboarding/OnboardingWizard'
 
 export default function HomePage() {
   const router = useRouter()
   const [data, setData] = useState<DashboardData | null>(null)
   const [briefing, setBriefing] = useState<BriefingData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showOnboarding, setShowOnboarding] = useState(false)
   const [taskFilter, setTaskFilter] = useState<'all' | 'pending' | 'completed'>('all')
   const [showAddSheet, setShowAddSheet] = useState(false)
   const [newTask, setNewTask] = useState({ title: '', priority: 'medium', category: 'personal', estimatedMinutes: 30 })
@@ -147,9 +149,23 @@ export default function HomePage() {
   }
 
   useEffect(() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('srushti_onboarding_done') !== 'true') {
+      setShowOnboarding(true)
+    }
+
     fetchDashboard()
-    const iv = setInterval(fetchDashboard, 30000)
-    return () => clearInterval(iv)
+
+    const handleDataChanged = () => {
+      fetchDashboard()
+    }
+
+    window.addEventListener('srushti_data_changed', handleDataChanged)
+    const iv = setInterval(fetchDashboard, 15000)
+
+    return () => {
+      window.removeEventListener('srushti_data_changed', handleDataChanged)
+      clearInterval(iv)
+    }
   }, [])
 
   const handleToggleTask = async (task: Task) => {
@@ -733,6 +749,15 @@ export default function HomePage() {
             </div>
           </div>
         </>
+      )}
+
+      {showOnboarding && (
+        <OnboardingWizard
+          onCompleted={() => {
+            setShowOnboarding(false)
+            fetchDashboard()
+          }}
+        />
       )}
 
       <BottomNav />

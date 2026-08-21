@@ -320,9 +320,28 @@ export default function SettingsPage() {
     }
 
     try {
-      await fetch('/api/settings/backup', { method: 'DELETE' })
-      alert('All local user data wiped cleanly.')
-      window.location.reload()
+      await Promise.all([
+        localDb.tasks.clear(),
+        localDb.habits.clear(),
+        localDb.habitLogs.clear(),
+        localDb.goals.clear(),
+        localDb.events.clear(),
+        localDb.memories.clear(),
+        localDb.messages.clear(),
+        localDb.conversations.clear(),
+        localDb.notifications.clear(),
+        localDb.user.clear(),
+        localDb.preferences.clear(),
+      ]).catch(() => {})
+
+      if (typeof localStorage !== 'undefined') {
+        localStorage.clear()
+        localStorage.setItem('srushti_onboarding_done', 'false')
+      }
+
+      await fetch('/api/settings/backup', { method: 'DELETE' }).catch(() => {})
+      alert('✨ All user data wiped. Starting fresh onboarding setup.')
+      window.location.href = '/'
     } catch {
       alert('Failed to reset.')
     }

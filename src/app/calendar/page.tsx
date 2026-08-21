@@ -108,6 +108,15 @@ export default function CalendarPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false))
+
+    const handleDataChanged = () => {
+      Promise.all([getClientEvents(), getClientTasks()]).then(([ev, ta]) => {
+        if (ev) setEvents(ev)
+        if (ta) setTasks(ta)
+      }).catch(() => {})
+    }
+    window.addEventListener('srushti_data_changed', handleDataChanged)
+    return () => window.removeEventListener('srushti_data_changed', handleDataChanged)
   }, [currentDate])
 
   // Month days

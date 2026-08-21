@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import AppHeader from '@/components/layout/AppHeader'
 import BottomNav from '@/components/layout/BottomNav'
 import { format, subDays, isSameDay } from 'date-fns'
+import { getClientHabits, toggleClientHabit, createClientHabit } from '@/lib/data/clientData'
 
 interface Habit {
   id: string
@@ -42,13 +43,19 @@ export default function HabitsPage() {
 
   const fetchHabits = async () => {
     try {
+      // 1. Try local offline data first
+      const localHabits = await getClientHabits()
+      if (localHabits) {
+        setHabits(localHabits as any)
+      }
+
+      // 2. Also try API if server is running
       const [hRes, lRes] = await Promise.all([
-        fetch('/api/habits').then(r => r.json()),
-        fetch(`/api/habits/logs?date=${todayStr}`).then(r => r.json()),
+        fetch('/api/habits').then(r => r.json()).catch(() => null),
+        fetch(`/api/habits/logs?date=${todayStr}`).then(r => r.json()).catch(() => null),
       ])
 
-      const habitList: Habit[] = Array.isArray(hRes) ? hRes : []
-      setHabits(habitList)
+      if (Array.isArray(hRes)) setHabits(hRes)
 
       const logMap: Record<string, string> = {}
       if (Array.isArray(lRes)) {
@@ -65,13 +72,20 @@ export default function HabitsPage() {
 
   useEffect(() => {
     fetchHabits()
+    const handleDataChanged = () => {
+      fetchHabits()
+    }
+    window.addEventListener('srushti_data_changed', handleDataChanged)
+    return () => window.removeEventListener('srushti_data_changed', handleDataChanged)
   }, [])
 
   const toggleHabit = async (habitId: string) => {
     const current = todayLogs[habitId]
-    const newStatus = current === 'completed' ? 'skipped' : 'completed'
+    const isNowCompleted = current !== 'completed'
+    const newStatus = isNowCompleted ? 'completed' : 'skipped'
 
     setTodayLogs(prev => ({ ...prev, [habitId]: newStatus }))
+    await toggleClientHabit(habitId, isNowCompleted).catch(() => {})
 
     await fetch('/api/habits/logs', {
       method: 'POST',
@@ -81,18 +95,19 @@ export default function HabitsPage() {
         date: todayStr,
         status: newStatus,
       }),
-    })
+    }).catch(() => {})
 
     fetchHabits()
   }
 
   const handleAddHabit = async () => {
     if (!newHabit.title.trim()) return
+    await createClientHabit(newHabit).catch(() => {})
     await fetch('/api/habits', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newHabit),
-    })
+    }).catch(() => {})
     setNewHabit({ title: '', frequency: 'daily', scheduledTime: '08:00', category: 'health' })
     setShowAdd(false)
     fetchHabits()

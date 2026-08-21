@@ -80,6 +80,7 @@ export default function ChatPage() {
   const [statusIndex, setStatusIndex] = useState(0)
   const [showQuickActions, setShowQuickActions] = useState(true)
   const [liveLatency, setLiveLatency] = useState<number | null>(null)
+  const [executingTool, setExecutingTool] = useState<{ name: string; detail: string; elapsed: number } | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -226,6 +227,13 @@ export default function ChatPage() {
             setMessages(prev =>
               prev.map(m => (m.id === assistantMsgId ? { ...m, content: assistantText } : m))
             )
+          },
+          onToolExecuting: (toolName, params) => {
+            const detail = params.title || params.content || ''
+            setExecutingTool({ name: toolName, detail, elapsed: 0 })
+          },
+          onToolExecuted: (toolName, result) => {
+            setExecutingTool(null)
           }
         }
       )
@@ -441,6 +449,27 @@ export default function ChatPage() {
 
         {/* Input area */}
         <div className="chat-input-area">
+          {executingTool && (
+            <div
+              className="fade-in-up"
+              style={{
+                padding: '6px 14px',
+                marginBottom: 6,
+                borderRadius: 'var(--radius-md)',
+                background: 'linear-gradient(90deg, rgba(91,107,240,0.12), rgba(236,72,153,0.12))',
+                border: '1px solid rgba(91,107,240,0.3)',
+                fontSize: '11px',
+                fontWeight: 600,
+                color: 'var(--brand-primary)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <span>⚙️</span>
+              <span>Agent Executing: <strong>{executingTool.name.replace('_', ' ')}</strong> {executingTool.detail ? `"${executingTool.detail}"` : ''}...</span>
+            </div>
+          )}
           <form onSubmit={(e) => { e.preventDefault(); sendMessage(input) }}>
             <div className="chat-input-row">
               <div className="chat-input-wrapper">
