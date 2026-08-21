@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AppHeader from '@/components/layout/AppHeader'
 import BottomNav from '@/components/layout/BottomNav'
+import { localDb } from '@/lib/db/localDb'
 
 interface UserSummary {
   name: string
@@ -90,28 +91,51 @@ const SECTIONS = [
 export default function MorePage() {
   const router = useRouter()
   const [userData, setUserData] = useState<UserSummary>({
-    name: 'User',
+    name: 'Sanket',
     timezone: 'Asia/Kolkata',
     activeGoalsCount: 0,
     habitsCount: 0,
     memoriesCount: 0,
   })
 
-  useEffect(() => {
-    Promise.all([
-      fetch('/api/user').then(r => r.json()),
-      fetch('/api/goals').then(r => r.json()),
-      fetch('/api/habits').then(r => r.json()),
-      fetch('/api/memory').then(r => r.json()),
-    ]).then(([u, g, h, m]) => {
+  const loadUserData = async () => {
+    try {
+      let userName = typeof localStorage !== 'undefined' ? localStorage.getItem('srushti_user_name') : null
+      let userTz = 'Asia/Kolkata'
+
+      const userRecord = await localDb.user.get('default-user').catch(() => null)
+      if (userRecord) {
+        if (!userName && userRecord.name) userName = userRecord.name
+        if (userRecord.timezone) userTz = userRecord.timezone
+      }
+
+      if (!userName) userName = 'Sanket'
+
+      const [goals, habits, memories] = await Promise.all([
+        localDb.goals.toArray().catch(() => []),
+        localDb.habits.toArray().catch(() => []),
+        localDb.memories.toArray().catch(() => []),
+      ])
+
       setUserData({
-        name: u?.name || 'User',
-        timezone: u?.timezone || 'Asia/Kolkata',
-        activeGoalsCount: Array.isArray(g) ? g.filter((item: any) => item.status === 'active').length : 0,
-        habitsCount: Array.isArray(h) ? h.length : 0,
-        memoriesCount: Array.isArray(m) ? m.length : 0,
+        name: userName,
+        timezone: userTz,
+        activeGoalsCount: goals.filter(g => g.status === 'active').length,
+        habitsCount: habits.length,
+        memoriesCount: memories.length,
       })
-    }).catch(() => {})
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  useEffect(() => {
+    loadUserData()
+    const handleDataChanged = () => {
+      loadUserData()
+    }
+    window.addEventListener('srushti_data_changed', handleDataChanged)
+    return () => window.removeEventListener('srushti_data_changed', handleDataChanged)
   }, [])
 
   return (

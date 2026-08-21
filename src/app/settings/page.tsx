@@ -121,6 +121,10 @@ export default function SettingsPage() {
         localStorage.setItem('srushti_user_timezone', settings.timezone || 'Asia/Kolkata')
       }
 
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('srushti_data_changed'))
+      }
+
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
     } catch {

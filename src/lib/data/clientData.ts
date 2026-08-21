@@ -106,6 +106,13 @@ export async function updateClientTask(id: string, updates: Partial<LocalTask>):
   await localDb.tasks.update(id, updates)
 }
 
+export async function toggleClientTask(id: string, completed: boolean): Promise<void> {
+  await localDb.tasks.update(id, {
+    status: completed ? 'completed' : 'planned',
+    completedAt: completed ? new Date().toISOString() : undefined,
+  })
+}
+
 export async function deleteClientTask(id: string): Promise<void> {
   await localDb.tasks.delete(id)
 }

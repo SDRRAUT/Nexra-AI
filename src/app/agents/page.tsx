@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import AppHeader from '@/components/layout/AppHeader'
 import BottomNav from '@/components/layout/BottomNav'
 import { format } from 'date-fns'
+import { localDb } from '@/lib/db/localDb'
 
 interface AgentAction {
   id: string; agentName: string; actionType: string; description: string
@@ -27,12 +28,70 @@ export default function AgentsPage() {
   const [actions, setActions] = useState<AgentAction[]>([])
   const [loading, setLoading] = useState(true)
 
+  const loadActions = async () => {
+    try {
+      const [tasks, memories, goals, habits, events] = await Promise.all([
+        localDb.tasks.toArray().catch(() => []),
+        localDb.memories.toArray().catch(() => []),
+        localDb.goals.toArray().catch(() => []),
+        localDb.habits.toArray().catch(() => []),
+        localDb.events.toArray().catch(() => []),
+      ])
+
+      const generatedActions: AgentAction[] = []
+
+      tasks.forEach(t => {
+        generatedActions.push({
+          id: 'act-t-' + t.id,
+          agentName: 'task_agent',
+          actionType: t.status === 'completed' ? 'task_completed' : 'task_created',
+          description: `${t.status === 'completed' ? 'Completed' : 'Scheduled'} task "${t.title}" (${t.priority} priority)`,
+          status: t.status === 'completed' ? 'executed' : 'scheduled',
+          canUndo: true,
+          createdAt: t.createdAt || new Date().toISOString(),
+        })
+      })
+
+      memories.forEach(m => {
+        generatedActions.push({
+          id: 'act-m-' + m.id,
+          agentName: 'memory_agent',
+          actionType: 'memory_saved',
+          description: `Saved knowledge memory: "${m.content.slice(0, 45)}..."`,
+          status: 'executed',
+          canUndo: false,
+          createdAt: m.createdAt || new Date().toISOString(),
+        })
+      })
+
+      goals.forEach(g => {
+        generatedActions.push({
+          id: 'act-g-' + g.id,
+          agentName: 'goal_agent',
+          actionType: 'goal_aligned',
+          description: `Aligned strategy goal "${g.title}" with target progress ${g.progress}%`,
+          status: 'executed',
+          canUndo: false,
+          createdAt: g.createdAt || new Date().toISOString(),
+        })
+      })
+
+      generatedActions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      setActions(generatedActions)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
-    fetch('/api/agents/actions')
-      .then(r => r.json())
-      .then(data => setActions(data))
-      .catch(() => { })
-      .finally(() => setLoading(false))
+    loadActions()
+    const handleDataChanged = () => {
+      loadActions()
+    }
+    window.addEventListener('srushti_data_changed', handleDataChanged)
+    return () => window.removeEventListener('srushti_data_changed', handleDataChanged)
   }, [])
 
   const groupByDate = (actions: AgentAction[]) => {

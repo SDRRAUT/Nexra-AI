@@ -6,6 +6,7 @@ import AppHeader from '@/components/layout/AppHeader'
 import BottomNav from '@/components/layout/BottomNav'
 import { format, formatDistanceToNow } from 'date-fns'
 import { sendNativeNotification } from '@/lib/notifications/native'
+import { localDb, type LocalNotification } from '@/lib/db/localDb'
 
 interface Notification {
   id: string
@@ -36,9 +37,15 @@ export default function NotificationsPage() {
 
   const fetchNotifications = async () => {
     try {
-      const res = await fetch('/api/notifications')
-      const data = await res.json()
-      setNotifications(Array.isArray(data) ? data : [])
+      // 1. Try local IndexedDB
+      const localNotifs = await localDb.notifications.toArray().catch(() => [])
+      if (localNotifs && localNotifs.length > 0) {
+        setNotifications(localNotifs as any)
+      }
+
+      // 2. Also try API if server is running
+      const res = await fetch('/api/notifications').then(r => r.json()).catch(() => null)
+      if (Array.isArray(res)) setNotifications(res)
     } catch {
     } finally {
       setLoading(false)
@@ -47,32 +54,41 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     fetchNotifications()
+    const handleDataChanged = () => {
+      fetchNotifications()
+    }
+    window.addEventListener('srushti_data_changed', handleDataChanged)
+    return () => window.removeEventListener('srushti_data_changed', handleDataChanged)
   }, [])
 
   const markRead = async (id: string, e?: React.MouseEvent) => {
     e?.stopPropagation()
+    await localDb.notifications.update(id, { status: 'read' }).catch(() => {})
     await fetch('/api/notifications', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, status: 'read' }),
-    })
+    }).catch(() => {})
     fetchNotifications()
   }
 
   const markAllRead = async () => {
+    const all = await localDb.notifications.toArray().catch(() => [])
+    await Promise.all(all.map(n => localDb.notifications.update(n.id, { status: 'read' }))).catch(() => {})
     await fetch('/api/notifications', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: 'all', status: 'read' }),
-    })
+    }).catch(() => {})
     fetchNotifications()
   }
 
   const deleteNotification = async (id: string, e?: React.MouseEvent) => {
     e?.stopPropagation()
+    await localDb.notifications.delete(id).catch(() => {})
     await fetch(`/api/notifications?id=${id}`, {
       method: 'DELETE',
-    })
+    }).catch(() => {})
     fetchNotifications()
   }
 

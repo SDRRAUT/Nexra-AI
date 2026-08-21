@@ -6,6 +6,13 @@ import AppHeader from '@/components/layout/AppHeader'
 import BottomNav from '@/components/layout/BottomNav'
 import { format } from 'date-fns'
 
+import {
+  getClientTasks,
+  toggleClientTask,
+  deleteClientTask,
+  createClientTask,
+} from '@/lib/data/clientData'
+
 interface Task {
   id: string; title: string; priority: string; status: string
   deadline?: string; scheduledStart?: string; estimatedMinutes?: number
@@ -31,10 +38,23 @@ export default function TasksPage() {
 
   const fetchTasks = async () => {
     try {
+      // 1. Load from local IndexedDB
+      const allTasks = await getClientTasks()
+      let filtered = allTasks
+
+      if (filter === 'overdue') {
+        const now = new Date().toISOString()
+        filtered = allTasks.filter(t => t.deadline && t.deadline < now && t.status !== 'completed')
+      } else if (filter !== 'all') {
+        filtered = allTasks.filter(t => t.status === filter)
+      }
+
+      setTasks(filtered as any)
+
+      // 2. Also try API if server running
       const url = filter === 'all' ? '/api/tasks' : `/api/tasks?status=${filter}`
-      const res = await fetch(url)
-      const data = await res.json()
-      setTasks(data)
+      const res = await fetch(url).then(r => r.json()).catch(() => null)
+      if (Array.isArray(res)) setTasks(res)
     } catch (e) {
       console.error(e)
     } finally {
@@ -42,30 +62,42 @@ export default function TasksPage() {
     }
   }
 
-  useEffect(() => { fetchTasks() }, [filter])
+  useEffect(() => {
+    fetchTasks()
+    const handleDataChanged = () => {
+      fetchTasks()
+    }
+    window.addEventListener('srushti_data_changed', handleDataChanged)
+    return () => window.removeEventListener('srushti_data_changed', handleDataChanged)
+  }, [filter])
 
   const handleComplete = async (task: Task) => {
-    const newStatus = task.status === 'completed' ? 'planned' : 'completed'
+    const isNowCompleted = task.status !== 'completed'
+    await toggleClientTask(task.id, isNowCompleted).catch(() => {})
+
     await fetch(`/api/tasks/${task.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus }),
-    })
+      body: JSON.stringify({ status: isNowCompleted ? 'completed' : 'planned' }),
+    }).catch(() => {})
+
     fetchTasks()
   }
 
   const handleDelete = async (id: string) => {
-    await fetch(`/api/tasks/${id}`, { method: 'DELETE' })
+    await deleteClientTask(id).catch(() => {})
+    await fetch(`/api/tasks/${id}`, { method: 'DELETE' }).catch(() => {})
     fetchTasks()
   }
 
   const handleAddTask = async () => {
     if (!newTask.title.trim()) return
+    await createClientTask(newTask).catch(() => {})
     await fetch('/api/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newTask),
-    })
+    }).catch(() => {})
     setNewTask({ title: '', priority: 'medium', category: '' })
     setShowAddSheet(false)
     fetchTasks()

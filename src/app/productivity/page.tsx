@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AppHeader from '@/components/layout/AppHeader'
 import BottomNav from '@/components/layout/BottomNav'
+import { localDb } from '@/lib/db/localDb'
 
 interface ProductivityData {
   period: string
@@ -18,12 +19,42 @@ export default function ProductivityPage() {
   const [data, setData] = useState<ProductivityData | null>(null)
   const [loading, setLoading] = useState(true)
 
+  const loadProductivity = async () => {
+    try {
+      const tasks = await localDb.tasks.toArray().catch(() => [])
+      const totalPlanned = tasks.length
+      const totalCompleted = tasks.filter(t => t.status === 'completed').length
+      const completionRate = totalPlanned > 0 ? Math.round((totalCompleted / totalPlanned) * 100) : 100
+      const averageScore = completionRate
+
+      const records = [
+        { date: 'Today', plannedTasks: totalPlanned, completedTasks: totalCompleted, score: completionRate }
+      ]
+
+      setData({
+        period,
+        records,
+        summary: {
+          totalPlanned,
+          totalCompleted,
+          completionRate,
+          averageScore,
+        }
+      })
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
-    fetch(`/api/productivity?period=${period}`)
-      .then(r => r.json())
-      .then(d => setData(d))
-      .catch(() => { })
-      .finally(() => setLoading(false))
+    loadProductivity()
+    const handleDataChanged = () => {
+      loadProductivity()
+    }
+    window.addEventListener('srushti_data_changed', handleDataChanged)
+    return () => window.removeEventListener('srushti_data_changed', handleDataChanged)
   }, [period])
 
   const getScoreColor = (score: number) => {
