@@ -12,6 +12,7 @@ import {
   createClientConversation,
   deleteClientConversation,
 } from '@/lib/data/clientData'
+import MarkdownContent from '@/components/chat/MarkdownContent'
 
 interface ChatMessage {
   id: string
@@ -427,9 +428,12 @@ export default function ChatPage() {
                   </div>
                 )}
                 {message.content && (
-                  <div className="message-bubble" style={{ whiteSpace: 'pre-wrap' }}>
-                    {message.content}
-                    {isLatestStreamingAssistant && <span className="stream-cursor" />}
+                  <div className="message-bubble">
+                    {isUser ? (
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{message.content}</div>
+                    ) : (
+                      <MarkdownContent content={message.content} isStreaming={isLatestStreamingAssistant} />
+                    )}
                   </div>
                 )}
 
