@@ -5,6 +5,13 @@ import AppHeader from '@/components/layout/AppHeader'
 import BottomNav from '@/components/layout/BottomNav'
 import { format, formatDistanceToNow } from 'date-fns'
 import { streamClientChat } from '@/lib/ai/clientAi'
+import {
+  getClientConversations,
+  getClientMessages,
+  saveClientMessage,
+  createClientConversation,
+  deleteClientConversation,
+} from '@/lib/data/clientData'
 
 interface ChatMessage {
   id: string
@@ -92,23 +99,34 @@ export default function ChatPage() {
   }, [])
 
   // Load chat history and conversations list on mount
-  const loadChatData = async (convId?: string) => {
+  const loadChatData = async (targetConvId?: string) => {
     setIsFetchingHistory(true)
     try {
-      const url = convId ? `/api/chat?conversationId=${convId}` : '/api/chat'
-      const res = await fetch(url)
-      const data = await res.json()
+      // 1. Get all conversations from local IndexedDB
+      const convList = await getClientConversations()
+      setConversations(convList)
 
-      if (data?.conversationId) {
-        setActiveConvId(data.conversationId)
+      let activeId: string = targetConvId || (typeof localStorage !== 'undefined' ? localStorage.getItem('srushti_active_conv_id') || '' : '')
+
+      if (!activeId || !convList.some((c: any) => c.id === activeId)) {
+        if (convList.length > 0) {
+          activeId = convList[0].id
+        } else {
+          const newConv = await createClientConversation('New Conversation')
+          activeId = newConv.id
+          setConversations([newConv])
+        }
       }
-      if (Array.isArray(data?.conversations)) {
-        setConversations(data.conversations)
+
+      setActiveConvId(activeId)
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('srushti_active_conv_id', activeId)
       }
-      if (Array.isArray(data?.messages)) {
-        setMessages(data.messages)
-        setShowQuickActions(data.messages.length === 0)
-      }
+
+      // 2. Load messages for this active conversation
+      const savedMessages = await getClientMessages(activeId)
+      setMessages(savedMessages)
+      setShowQuickActions(savedMessages.length === 0)
     } catch (e) {
       console.error('Failed to load chat history', e)
     } finally {
@@ -144,15 +162,16 @@ export default function ChatPage() {
 
   const startNewChat = async () => {
     try {
-      const res = await fetch('/api/chat?new=true', { method: 'POST' })
-      const data = await res.json()
-      if (data?.conversationId) {
-        setActiveConvId(data.conversationId)
-        setMessages([])
-        setShowQuickActions(true)
-        setShowHistoryDrawer(false)
-        loadChatData(data.conversationId)
+      const newConv = await createClientConversation('New Conversation')
+      setActiveConvId(newConv.id)
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('srushti_active_conv_id', newConv.id)
       }
+      setMessages([])
+      setShowQuickActions(true)
+      setShowHistoryDrawer(false)
+      const convList = await getClientConversations()
+      setConversations(convList)
     } catch (e) {
       console.error(e)
     }
@@ -160,19 +179,26 @@ export default function ChatPage() {
 
   const deleteConversation = async (convId: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    if (confirm('Delete this conversation?')) {
-      await fetch(`/api/chat?conversationId=${convId}`, { method: 'DELETE' })
+    if (confirm('Delete this conversation thread?')) {
+      await deleteClientConversation(convId)
       if (activeConvId === convId) {
         startNewChat()
       } else {
-        loadChatData(activeConvId || undefined)
+        const convList = await getClientConversations()
+        setConversations(convList)
       }
     }
   }
 
-  const selectConversation = (convId: string) => {
+  const selectConversation = async (convId: string) => {
     setShowHistoryDrawer(false)
-    loadChatData(convId)
+    setActiveConvId(convId)
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('srushti_active_conv_id', convId)
+    }
+    const savedMessages = await getClientMessages(convId)
+    setMessages(savedMessages)
+    setShowQuickActions(savedMessages.length === 0)
   }
 
   const sendMessage = async (userText: string) => {
@@ -186,12 +212,33 @@ export default function ChatPage() {
     firstTokenTimeRef.current = 0
     setLiveLatency(null)
 
+    const userMsgId = 'msg-' + Date.now()
     const userMessage: ChatMessage = {
-      id: 'msg-' + Date.now(),
+      id: userMsgId,
       role: 'user',
       content: trimmed,
       createdAt: new Date(),
     }
+
+    // Ensure active conversation ID exists
+    let currConvId: string = activeConvId || ''
+    if (!currConvId) {
+      const newConv = await createClientConversation(trimmed.slice(0, 30))
+      currConvId = newConv.id
+      setActiveConvId(currConvId)
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('srushti_active_conv_id', currConvId)
+      }
+    }
+
+    // Save user message to IndexedDB immediately
+    await saveClientMessage({
+      id: userMsgId,
+      conversationId: currConvId,
+      role: 'user',
+      content: trimmed,
+      createdAt: new Date().toISOString(),
+    }).catch(() => {})
 
     const newMessages = [...messages, userMessage]
     setMessages(newMessages)
@@ -249,6 +296,20 @@ export default function ChatPage() {
             : m
         )
       )
+
+      // Save completed assistant response to IndexedDB
+      await saveClientMessage({
+        id: assistantMsgId,
+        conversationId: currConvId,
+        role: 'assistant',
+        content: assistantText,
+        latencyMs: firstTokenTimeRef.current,
+        totalDurationMs,
+        tokenCount: estimatedTokens,
+        createdAt: new Date().toISOString(),
+      }).catch(() => {})
+
+      getClientConversations().then(setConversations).catch(() => {})
     } catch (err: any) {
       console.error(err)
       const errMsg = err?.message?.includes('missing')

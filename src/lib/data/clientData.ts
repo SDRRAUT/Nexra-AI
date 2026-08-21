@@ -224,3 +224,79 @@ export async function createClientEvent(event: Partial<LocalEvent>): Promise<Loc
 export async function deleteClientEvent(id: string): Promise<void> {
   await localDb.events.delete(id)
 }
+
+// ── 7. CHAT CONVERSATIONS & MESSAGES CRUD ─────────────────────
+export async function getClientConversations(): Promise<any[]> {
+  await ensureInitialData()
+  const convs = await localDb.conversations.orderBy('updatedAt').reverse().toArray()
+  
+  // Attach message counts
+  const result = await Promise.all(
+    convs.map(async (c) => {
+      const msgCount = await localDb.messages.where('conversationId').equals(c.id).count()
+      return {
+        ...c,
+        _count: { messages: msgCount }
+      }
+    })
+  )
+  return result
+}
+
+export async function getClientMessages(conversationId: string): Promise<any[]> {
+  await ensureInitialData()
+  return localDb.messages.where('conversationId').equals(conversationId).sortBy('createdAt')
+}
+
+export async function createClientConversation(title: string = 'New Conversation'): Promise<any> {
+  await ensureInitialData()
+  const convId = 'conv-' + Date.now()
+  const newConv = {
+    id: convId,
+    title,
+    updatedAt: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+  }
+  await localDb.conversations.add(newConv)
+  return newConv
+}
+
+export async function saveClientMessage(msg: {
+  id: string
+  conversationId: string
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  latencyMs?: number
+  totalDurationMs?: number
+  tokenCount?: number
+  createdAt?: string
+}): Promise<void> {
+  await localDb.messages.put({
+    id: msg.id,
+    conversationId: msg.conversationId,
+    role: msg.role,
+    content: msg.content,
+    latencyMs: msg.latencyMs,
+    totalDurationMs: msg.totalDurationMs,
+    tokenCount: msg.tokenCount,
+    createdAt: msg.createdAt || new Date().toISOString(),
+  })
+
+  // Update conversation updatedAt timestamp and title if first message
+  const conv = await localDb.conversations.get(msg.conversationId)
+  if (conv) {
+    let newTitle = conv.title
+    if (conv.title === 'New Conversation' && msg.role === 'user') {
+      newTitle = msg.content.slice(0, 32) + (msg.content.length > 32 ? '...' : '')
+    }
+    await localDb.conversations.update(msg.conversationId, {
+      title: newTitle,
+      updatedAt: new Date().toISOString(),
+    })
+  }
+}
+
+export async function deleteClientConversation(conversationId: string): Promise<void> {
+  await localDb.conversations.delete(conversationId)
+  await localDb.messages.where('conversationId').equals(conversationId).delete()
+}
