@@ -13,6 +13,7 @@ import {
   deleteClientConversation,
 } from '@/lib/data/clientData'
 import MarkdownContent from '@/components/chat/MarkdownContent'
+import { localDb } from '@/lib/db/localDb'
 
 interface ChatMessage {
   id: string
@@ -55,6 +56,12 @@ const SendIcon = () => (
   </svg>
 )
 
+const StopIcon = () => (
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+    <rect x="5" y="5" width="14" height="14" rx="2.5" />
+  </svg>
+)
+
 const HistoryIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
     <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
@@ -89,11 +96,13 @@ export default function ChatPage() {
   const [showQuickActions, setShowQuickActions] = useState(true)
   const [liveLatency, setLiveLatency] = useState<number | null>(null)
   const [executingTool, setExecutingTool] = useState<{ name: string; detail: string; elapsed: number } | null>(null)
+  const [assistantName, setAssistantName] = useState('Srushti')
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const sendTimeRef = useRef<number>(0)
   const firstTokenTimeRef = useRef<number>(0)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -103,6 +112,9 @@ export default function ChatPage() {
   const loadChatData = async (targetConvId?: string) => {
     setIsFetchingHistory(true)
     try {
+      const name = localStorage.getItem('srushti_assistant_name') || 'Srushti'
+      setAssistantName(name)
+
       // 1. Get all conversations from local IndexedDB
       const convList = await getClientConversations()
       setConversations(convList)
@@ -137,6 +149,13 @@ export default function ChatPage() {
 
   useEffect(() => {
     loadChatData()
+
+    const handleDataChanged = () => {
+      const name = localStorage.getItem('srushti_assistant_name') || 'Srushti'
+      setAssistantName(name)
+    }
+    window.addEventListener('srushti_data_changed', handleDataChanged)
+    return () => window.removeEventListener('srushti_data_changed', handleDataChanged)
   }, [])
 
   useEffect(() => {
@@ -248,6 +267,7 @@ export default function ChatPage() {
 
     const assistantMsgId = 'msg-' + (Date.now() + 1)
     let assistantText = ''
+    abortControllerRef.current = new AbortController()
 
     try {
       const firstTokenMs = Math.round(performance.now() - sendTimeRef.current)
@@ -283,7 +303,8 @@ export default function ChatPage() {
           onToolExecuted: (toolName, result) => {
             setExecutingTool(null)
           }
-        }
+        },
+        { signal: abortControllerRef.current.signal }
       )
 
       // Calculate total duration & token estimation
@@ -312,6 +333,19 @@ export default function ChatPage() {
 
       getClientConversations().then(setConversations).catch(() => {})
     } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        if (assistantText) {
+          await saveClientMessage({
+            id: assistantMsgId,
+            conversationId: currConvId,
+            role: 'assistant',
+            content: assistantText,
+            createdAt: new Date().toISOString(),
+          }).catch(() => {})
+        }
+        return
+      }
+
       console.error(err)
       const errMsg = err?.message?.includes('missing')
         ? '⚠️ Gemini API key is missing. Please go to Settings ⚙️ and add your Google Gemini API key.'
@@ -329,8 +363,30 @@ export default function ChatPage() {
     } finally {
       setIsLoading(false)
       setIsStreaming(false)
+      setExecutingTool(null)
       setTimeout(scrollToBottom, 100)
     }
+  }
+
+  const stopGeneration = () => {
+    abortControllerRef.current?.abort()
+    setIsLoading(false)
+    setIsStreaming(false)
+    setExecutingTool(null)
+  }
+
+  const undoMessage = async (msgId: string, text: string) => {
+    await localDb.messages.delete(msgId).catch(() => {})
+    const idx = messages.findIndex(m => m.id === msgId)
+    let newMsgs = messages.filter(m => m.id !== msgId)
+    if (idx !== -1 && messages[idx + 1] && messages[idx + 1].role === 'assistant') {
+      const nextId = messages[idx + 1].id
+      await localDb.messages.delete(nextId).catch(() => {})
+      newMsgs = newMsgs.filter(m => m.id !== nextId)
+    }
+    setMessages(newMsgs)
+    setInput(text)
+    inputRef.current?.focus()
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -392,7 +448,7 @@ export default function ChatPage() {
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 'var(--space-8) var(--space-5)', textAlign: 'center', gap: 'var(--space-3)' }}>
               <div style={{ fontSize: 56, marginBottom: 'var(--space-2)' }}>🌱</div>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-2xl)', fontWeight: 700, color: 'var(--text-primary)' }}>
-                Hi, I'm Srushti
+                Hi, I'm {assistantName}
               </div>
               <div style={{ fontSize: 'var(--text-base)', color: 'var(--text-secondary)', maxWidth: 280, lineHeight: 1.6 }}>
                 I manage your time, track your goals, and keep your life moving. Tell me what's happening.
@@ -437,11 +493,34 @@ export default function ChatPage() {
                   </div>
                 )}
 
-                {/* Micro-Diagnostics Badge (Latency, Tokens, Time) */}
+                {/* Micro-Diagnostics Badge & Undo Action */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '2px var(--space-2)', marginTop: 2 }}>
                   <span className="message-time" style={{ padding: 0, margin: 0 }}>
                     {format(new Date(message.createdAt || Date.now()), 'h:mm a')}
                   </span>
+
+                  {isUser && !isLoading && !isStreaming && (
+                    <button
+                      onClick={() => undoMessage(message.id, message.content)}
+                      style={{
+                        border: 'none',
+                        background: 'none',
+                        fontSize: '11px',
+                        color: 'var(--text-tertiary)',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 3,
+                        padding: '1px 4px',
+                        borderRadius: 'var(--radius-sm)',
+                      }}
+                      title="Undo send and edit in input"
+                    >
+                      <span>↩️</span>
+                      <span>Edit</span>
+                    </button>
+                  )}
+
                   {!isUser && (message.latencyMs || message.totalDurationMs) && (
                     <span
                       style={{
@@ -476,7 +555,7 @@ export default function ChatPage() {
                     {WORKING_STATUSES[statusIndex]}
                   </div>
                   <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span>Gemini 3.6 Flash</span>
+                    <span>{assistantName} AI Engine</span>
                     <span>·</span>
                     <span>Processing live...</span>
                   </div>
@@ -545,19 +624,38 @@ export default function ChatPage() {
                   value={input}
                   onChange={(e) => { setInput(e.target.value); adjustTextareaHeight() }}
                   onKeyDown={handleKeyDown}
-                  placeholder="Tell Srushti anything..."
+                  placeholder={`Tell ${assistantName} anything...`}
                   rows={1}
-                  disabled={isLoading}
+                  disabled={isLoading && !isStreaming}
                 />
               </div>
-              <button
-                type="submit"
-                className="chat-send-btn"
-                disabled={!input.trim() || isLoading}
-                id="chat-send-btn"
-              >
-                <SendIcon />
-              </button>
+              {isLoading || isStreaming ? (
+                <button
+                  type="button"
+                  className="chat-send-btn"
+                  onClick={stopGeneration}
+                  id="chat-stop-btn"
+                  title="Stop generating"
+                  style={{
+                    background: 'var(--status-error, #EF4444)',
+                    boxShadow: '0 2px 10px rgba(239, 68, 68, 0.45)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <StopIcon />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  className="chat-send-btn"
+                  disabled={!input.trim()}
+                  id="chat-send-btn"
+                >
+                  <SendIcon />
+                </button>
+              )}
             </div>
           </form>
         </div>

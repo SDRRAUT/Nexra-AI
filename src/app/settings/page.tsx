@@ -8,6 +8,7 @@ import { localDb } from '@/lib/db/localDb'
 
 interface Settings {
   name: string
+  assistantName: string
   timezone: string
   aiAutonomy: string
   notifications: boolean
@@ -32,7 +33,8 @@ export default function SettingsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [settings, setSettings] = useState<Settings>({
-    name: 'User',
+    name: 'Sanket',
+    assistantName: 'Srushti',
     timezone: 'Asia/Kolkata',
     aiAutonomy: 'autonomous',
     notifications: true,
@@ -78,7 +80,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     // Load local user settings
-    localDb.user.toArray().then((users: any[]) => {
+    localDb.user.toArray().then(async (users: any[]) => {
       let savedName = ''
       let savedTz = ''
       if (users && users.length > 0) {
@@ -93,9 +95,16 @@ export default function SettingsPage() {
         savedTz = localStorage.getItem('srushti_user_timezone') || ''
       }
 
+      let savedAssistantName = typeof localStorage !== 'undefined' ? localStorage.getItem('srushti_assistant_name') : ''
+      if (!savedAssistantName) {
+        const pref = await localDb.preferences.get('assistant_name').catch(() => null)
+        savedAssistantName = pref?.value || 'Srushti'
+      }
+
       setSettings(prev => ({
         ...prev,
         name: savedName || 'Sanket',
+        assistantName: savedAssistantName || 'Srushti',
         timezone: savedTz || 'Asia/Kolkata',
       }))
     }).catch(() => {})
@@ -116,8 +125,11 @@ export default function SettingsPage() {
         accountabilityCheck: settings.accountabilityCheck,
       }).catch(() => {})
 
+      await localDb.preferences.put({ key: 'assistant_name', value: settings.assistantName || 'Srushti' }).catch(() => {})
+
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem('srushti_user_name', settings.name || 'Sanket')
+        localStorage.setItem('srushti_assistant_name', settings.assistantName || 'Srushti')
         localStorage.setItem('srushti_user_timezone', settings.timezone || 'Asia/Kolkata')
       }
 
@@ -576,6 +588,17 @@ export default function SettingsPage() {
                   value={settings.name}
                   onChange={e => setSettings(p => ({ ...p, name: e.target.value }))}
                   placeholder="Enter your name"
+                />
+              </div>
+
+              <div className="input-group">
+                <label className="input-label">AI Assistant Name (Custom Name)</label>
+                <input
+                  id="settings-assistant-name-input"
+                  className="input"
+                  value={settings.assistantName}
+                  onChange={e => setSettings(p => ({ ...p, assistantName: e.target.value }))}
+                  placeholder="e.g. Srushti, Jarvis, Friday..."
                 />
               </div>
 

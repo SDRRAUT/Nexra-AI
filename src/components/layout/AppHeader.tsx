@@ -48,14 +48,24 @@ export default function AppHeader({ title, subtitle, showBack, showBrand = true,
   const [unreadCount, setUnreadCount] = useState(0)
   const [showThemes, setShowThemes] = useState(false)
   const [activeTheme, setActiveTheme] = useState('indigo')
+  const [assistantName, setAssistantName] = useState('Srushti')
   const themeMenuRef = useRef<HTMLDivElement>(null)
 
-  // Initialize theme from storage
+  // Initialize theme & assistant name from storage
   useEffect(() => {
     const saved = localStorage.getItem('srushti_theme') || 'indigo'
     setActiveTheme(saved)
     document.documentElement.setAttribute('data-theme', saved)
     document.body.setAttribute('data-theme', saved)
+
+    const loadAssistantName = () => {
+      const name = localStorage.getItem('srushti_assistant_name') || 'Srushti'
+      setAssistantName(name)
+    }
+    loadAssistantName()
+
+    window.addEventListener('srushti_data_changed', loadAssistantName)
+    return () => window.removeEventListener('srushti_data_changed', loadAssistantName)
   }, [])
 
   const selectTheme = (themeId: string) => {
@@ -107,7 +117,7 @@ export default function AppHeader({ title, subtitle, showBack, showBrand = true,
         )}
         {showBrand && !showBack && (
           <div className="app-header-brand" onClick={() => router.push('/')} style={{ cursor: 'pointer' }}>
-            <span className="app-header-name">Srushti</span>
+            <span className="app-header-name">{assistantName}</span>
             <span className="app-header-sub">~ By Team SDR</span>
           </div>
         )}
