@@ -67,7 +67,7 @@ export default function GoalsPage() {
     try {
       // 1. Try local offline data first
       const localGoals = await getClientGoals()
-      if (localGoals && localGoals.length > 0) {
+      if (localGoals) {
         setGoals(localGoals)
         setLoading(false)
       }

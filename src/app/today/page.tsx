@@ -24,6 +24,8 @@ const priorityBg: Record<string, string> = {
   medium: 'var(--priority-medium-bg)', low: 'var(--priority-low-bg)'
 }
 
+import { getClientTasks, toggleClientTask } from '@/lib/data/clientData'
+
 export default function TodayPage() {
   const router = useRouter()
   const [tasks, setTasks] = useState<Task[]>([])
@@ -32,10 +34,19 @@ export default function TodayPage() {
 
   const fetchTasks = async () => {
     try {
+      // 1. Local offline IndexedDB first
+      const localTasks = await getClientTasks()
+      if (localTasks) {
+        setTasks(localTasks as any)
+      }
+
+      // 2. Also try API if server is reachable
       const today = format(new Date(), 'yyyy-MM-dd')
-      const res = await fetch(`/api/tasks?date=${today}`)
-      const data = await res.json()
-      setTasks(data)
+      const res = await fetch(`/api/tasks?date=${today}`).catch(() => null)
+      if (res && res.ok) {
+        const data = await res.json()
+        if (Array.isArray(data)) setTasks(data)
+      }
     } catch (e) {
       console.error(e)
     } finally {
@@ -43,15 +54,26 @@ export default function TodayPage() {
     }
   }
 
-  useEffect(() => { fetchTasks() }, [])
+  useEffect(() => {
+    fetchTasks()
+    const handleDataChanged = () => {
+      fetchTasks()
+    }
+    window.addEventListener('srushti_data_changed', handleDataChanged)
+    return () => window.removeEventListener('srushti_data_changed', handleDataChanged)
+  }, [])
 
   const handleToggle = async (task: Task) => {
-    const newStatus = task.status === 'completed' ? 'planned' : 'completed'
+    const isNowCompleted = task.status !== 'completed'
+    const newStatus = isNowCompleted ? 'completed' : 'pending'
+    await toggleClientTask(task.id, isNowCompleted).catch(() => {})
+
     await fetch(`/api/tasks/${task.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: newStatus }),
-    })
+    }).catch(() => {})
+
     fetchTasks()
   }
 
