@@ -279,11 +279,13 @@ input, textarea, select { font-family: inherit; }
   position: sticky;
   top: 0;
   z-index: 100;
-  height: var(--header-height);
+  height: calc(var(--header-height) + env(safe-area-inset-top, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 var(--space-5);
+  padding-left: max(var(--space-5), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--space-5), env(safe-area-inset-right, 0px));
   background: var(--bg-glass);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -323,7 +325,7 @@ input, textarea, select { font-family: inherit; }
 
 .bottom-nav {
   position: fixed;
-  bottom: 12px;
+  bottom: max(12px, env(safe-area-inset-bottom, 12px));
   left: 50%;
   transform: translateX(-50%);
   width: calc(100% - 24px);

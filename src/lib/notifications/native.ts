@@ -109,3 +109,121 @@ export async function sendNativeNotification(options: {
 
   return false
 }
+
+/**
+ * Schedules a daily recurring 8:00 AM Morning Briefing alarm
+ */
+export async function scheduleDailyMorningBriefing(hour = 8, minute = 0) {
+  if (!Capacitor.isNativePlatform()) return
+
+  try {
+    await initializeNotificationChannels()
+
+    const scheduledDate = new Date()
+    scheduledDate.setHours(hour, minute, 0, 0)
+    if (scheduledDate <= new Date()) {
+      scheduledDate.setDate(scheduledDate.getDate() + 1)
+    }
+
+    const assistantName = (typeof localStorage !== 'undefined' ? localStorage.getItem('srushti_assistant_name') : 'Srushti') || 'Srushti'
+    const userName = (typeof localStorage !== 'undefined' ? localStorage.getItem('srushti_user_name') : 'Sanket') || 'Sanket'
+
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: 888001,
+          title: `☀️ Good Morning, ${userName}!`,
+          body: `${assistantName} has planned your focus blocks and priorities for today. Tap to view your briefing!`,
+          channelId: SrushtiNotificationChannels.REMINDERS,
+          schedule: {
+            at: scheduledDate,
+            repeats: true,
+            every: 'day',
+            allowWhileIdle: true,
+          },
+          sound: 'res_default_notification',
+          smallIcon: 'ic_stat_notification',
+          iconColor: '#5B6BF0',
+        },
+      ],
+    })
+  } catch (e) {
+    console.warn('Failed to schedule daily briefing notification:', e)
+  }
+}
+
+/**
+ * Schedules a pre-alarm 15 minutes before a task is scheduled to start
+ */
+export async function scheduleTaskReminder(task: { id: string; title: string; scheduledTime?: string; dueDate?: string }) {
+  if (!Capacitor.isNativePlatform() || !task.scheduledTime) return
+
+  try {
+    const [h, m] = task.scheduledTime.split(':').map(Number)
+    if (isNaN(h) || isNaN(m)) return
+
+    const target = new Date()
+    target.setHours(h, m, 0, 0)
+    // 15 minutes before
+    target.setMinutes(target.getMinutes() - 15)
+
+    if (target <= new Date()) return // In the past
+
+    // Generate a unique integer ID from task.id
+    const numericId = Math.abs(task.id.split('').reduce((acc, char) => (acc << 5) - acc + char.charCodeAt(0), 0)) % 1000000
+
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: numericId,
+          title: `⚡ Upcoming Task: ${task.title}`,
+          body: `Starting in 15 minutes (${task.scheduledTime}). Get ready to focus!`,
+          channelId: SrushtiNotificationChannels.REMINDERS,
+          schedule: { at: target, allowWhileIdle: true },
+          sound: 'res_default_notification',
+          smallIcon: 'ic_stat_notification',
+          iconColor: '#5B6BF0',
+        },
+      ],
+    })
+  } catch (e) {
+    console.warn('Failed to schedule task reminder:', e)
+  }
+}
+
+/**
+ * Schedules daily habit reminder
+ */
+export async function scheduleHabitReminder(habit: { id: string; title: string; scheduledTime?: string }) {
+  if (!Capacitor.isNativePlatform() || !habit.scheduledTime) return
+
+  try {
+    const [h, m] = habit.scheduledTime.split(':').map(Number)
+    if (isNaN(h) || isNaN(m)) return
+
+    const target = new Date()
+    target.setHours(h, m, 0, 0)
+    if (target <= new Date()) {
+      target.setDate(target.getDate() + 1)
+    }
+
+    const numericId = Math.abs(habit.id.split('').reduce((acc, char) => (acc << 5) - acc + char.charCodeAt(0), 0)) % 1000000
+
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: numericId,
+          title: `🌱 Habit Reminder: ${habit.title}`,
+          body: `Time for your daily ${habit.title}! Keep your streak alive.`,
+          channelId: SrushtiNotificationChannels.ACCOUNTABILITY,
+          schedule: { at: target, repeats: true, every: 'day', allowWhileIdle: true },
+          sound: 'res_default_notification',
+          smallIcon: 'ic_stat_notification',
+          iconColor: '#10B981',
+        },
+      ],
+    })
+  } catch (e) {
+    console.warn('Failed to schedule habit reminder:', e)
+  }
+}

@@ -245,25 +245,48 @@ export default function SettingsPage() {
     }
   }
 
-  // ── EXPORT DATA ──────────────────────────────────────────
+  // ── EXPORT DATA (100% LOCAL OFFLINE JSON) ───────────────────
   const handleExportData = async () => {
     setIsExporting(true)
-    setBackupFeedback({ type: 'info', message: 'Generating backup snapshot...' })
+    setBackupFeedback({ type: 'info', message: 'Generating offline backup snapshot...' })
     try {
-      const res = await fetch('/api/settings/backup')
-      if (!res.ok) throw new Error('Failed to export')
+      const [tasks, goals, habits, habitLogs, memories, conversations, messages, preferences, user] = await Promise.all([
+        localDb.tasks.toArray(),
+        localDb.goals.toArray(),
+        localDb.habits.toArray(),
+        localDb.habitLogs.toArray(),
+        localDb.memories.toArray(),
+        localDb.conversations.toArray(),
+        localDb.messages.toArray(),
+        localDb.preferences.toArray(),
+        localDb.user.toArray(),
+      ])
 
-      const blob = await res.blob()
+      const backupData = {
+        version: '2.0',
+        exportedAt: new Date().toISOString(),
+        user,
+        tasks,
+        goals,
+        habits,
+        habitLogs,
+        memories,
+        conversations,
+        messages,
+        preferences,
+      }
+
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' })
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
       a.download = `srushti-backup-${new Date().toISOString().split('T')[0]}.json`
       document.body.appendChild(a)
       a.click()
-      a.remove()
+      document.body.removeChild(a)
       window.URL.revokeObjectURL(url)
 
-      setBackupFeedback({ type: 'success', message: '✅ Complete backup exported & downloaded!' })
+      setBackupFeedback({ type: 'success', message: '✅ Complete offline backup exported & downloaded!' })
       setTimeout(() => setBackupFeedback(null), 4000)
     } catch (e: any) {
       setBackupFeedback({ type: 'error', message: e.message || 'Export failed' })
@@ -272,7 +295,7 @@ export default function SettingsPage() {
     }
   }
 
-  // ── IMPORT DATA ──────────────────────────────────────────
+  // ── IMPORT DATA (100% LOCAL OFFLINE JSON) ───────────────────
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -295,26 +318,41 @@ export default function SettingsPage() {
         if (!confirm(confirmMsg)) return
 
         setIsImporting(true)
-        setBackupFeedback({ type: 'info', message: 'Importing data into database...' })
+        setBackupFeedback({ type: 'info', message: 'Restoring data into phone database...' })
 
-        const res = await fetch('/api/settings/backup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ backupData: parsed, mode: importMode }),
-        })
-        const data = await res.json()
-
-        if (res.ok && data.success) {
-          const counts = data.importedCounts
-          setBackupFeedback({
-            type: 'success',
-            message: `✅ Restored ${counts?.tasks || 0} tasks, ${counts?.goals || 0} goals, ${counts?.habits || 0} habits, ${counts?.memories || 0} memories!`,
-          })
-          if (fileInputRef.current) fileInputRef.current.value = ''
-          setTimeout(() => setBackupFeedback(null), 5000)
-        } else {
-          setBackupFeedback({ type: 'error', message: data.error || 'Import failed.' })
+        if (importMode === 'overwrite') {
+          await Promise.all([
+            localDb.tasks.clear(),
+            localDb.goals.clear(),
+            localDb.habits.clear(),
+            localDb.habitLogs.clear(),
+            localDb.memories.clear(),
+            localDb.conversations.clear(),
+            localDb.messages.clear(),
+          ])
         }
+
+        // Restore tables
+        if (Array.isArray(parsed.tasks)) await localDb.tasks.bulkPut(parsed.tasks).catch(() => {})
+        if (Array.isArray(parsed.goals)) await localDb.goals.bulkPut(parsed.goals).catch(() => {})
+        if (Array.isArray(parsed.habits)) await localDb.habits.bulkPut(parsed.habits).catch(() => {})
+        if (Array.isArray(parsed.habitLogs)) await localDb.habitLogs.bulkPut(parsed.habitLogs).catch(() => {})
+        if (Array.isArray(parsed.memories)) await localDb.memories.bulkPut(parsed.memories).catch(() => {})
+        if (Array.isArray(parsed.conversations)) await localDb.conversations.bulkPut(parsed.conversations).catch(() => {})
+        if (Array.isArray(parsed.messages)) await localDb.messages.bulkPut(parsed.messages).catch(() => {})
+        if (Array.isArray(parsed.preferences)) await localDb.preferences.bulkPut(parsed.preferences).catch(() => {})
+        if (Array.isArray(parsed.user) && parsed.user.length > 0) await localDb.user.bulkPut(parsed.user).catch(() => {})
+
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('srushti_data_changed'))
+        }
+
+        setBackupFeedback({
+          type: 'success',
+          message: `✅ Restored ${(parsed.tasks || []).length} tasks, ${(parsed.goals || []).length} goals, ${(parsed.habits || []).length} habits, ${(parsed.memories || []).length} memories!`,
+        })
+        if (fileInputRef.current) fileInputRef.current.value = ''
+        setTimeout(() => setBackupFeedback(null), 5000)
       } catch (err: any) {
         setBackupFeedback({ type: 'error', message: err.message || 'Failed to parse JSON file' })
       } finally {

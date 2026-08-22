@@ -14,6 +14,7 @@ import {
 } from '@/lib/data/clientData'
 import MarkdownContent from '@/components/chat/MarkdownContent'
 import { localDb } from '@/lib/db/localDb'
+import { voiceEngine } from '@/lib/voice/voiceEngine'
 
 interface ChatMessage {
   id: string
@@ -62,6 +63,22 @@ const StopIcon = () => (
   </svg>
 )
 
+const MicIcon = ({ active }: { active?: boolean }) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+    <line x1="12" y1="19" x2="12" y2="23" />
+    <line x1="8" y1="23" x2="16" y2="23" />
+  </svg>
+)
+
+const SpeakerIcon = ({ active }: { active?: boolean }) => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+  </svg>
+)
+
 const HistoryIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
     <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
@@ -97,12 +114,51 @@ export default function ChatPage() {
   const [liveLatency, setLiveLatency] = useState<number | null>(null)
   const [executingTool, setExecutingTool] = useState<{ name: string; detail: string; elapsed: number } | null>(null)
   const [assistantName, setAssistantName] = useState('Srushti')
+  const [isListening, setIsListening] = useState(false)
+  const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const sendTimeRef = useRef<number>(0)
   const firstTokenTimeRef = useRef<number>(0)
   const abortControllerRef = useRef<AbortController | null>(null)
+
+  const toggleVoiceInput = () => {
+    if (isListening) {
+      voiceEngine.stopListening()
+      setIsListening(false)
+    } else {
+      setIsListening(true)
+      voiceEngine.startListening(
+        (interimText) => {
+          setInput(interimText)
+        },
+        (finalText) => {
+          setInput(finalText)
+          setIsListening(false)
+        },
+        (err) => {
+          console.warn('Voice error:', err)
+          setIsListening(false)
+        },
+        () => {
+          setIsListening(false)
+        }
+      )
+    }
+  }
+
+  const toggleSpeakMessage = (msgId: string, content: string) => {
+    if (speakingMsgId === msgId) {
+      voiceEngine.stopSpeaking()
+      setSpeakingMsgId(null)
+    } else {
+      setSpeakingMsgId(msgId)
+      voiceEngine.speak(content, () => {
+        setSpeakingMsgId(null)
+      })
+    }
+  }
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -521,6 +577,29 @@ export default function ChatPage() {
                     </button>
                   )}
 
+                  {!isUser && message.content && (
+                    <button
+                      onClick={() => toggleSpeakMessage(message.id, message.content)}
+                      style={{
+                        border: 'none',
+                        background: speakingMsgId === message.id ? 'var(--brand-primary)' : 'none',
+                        color: speakingMsgId === message.id ? 'white' : 'var(--text-tertiary)',
+                        fontSize: '11px',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 3,
+                        padding: '1px 5px',
+                        borderRadius: 'var(--radius-sm)',
+                        transition: 'all 0.2s ease',
+                      }}
+                      title={speakingMsgId === message.id ? 'Stop speaking' : 'Listen to reply'}
+                    >
+                      <SpeakerIcon active={speakingMsgId === message.id} />
+                      <span>{speakingMsgId === message.id ? 'Stop' : 'Listen'}</span>
+                    </button>
+                  )}
+
                   {!isUser && (message.latencyMs || message.totalDurationMs) && (
                     <span
                       style={{
@@ -614,9 +693,56 @@ export default function ChatPage() {
               <span>Agent Executing: <strong>{executingTool.name.replace('_', ' ')}</strong> {executingTool.detail ? `"${executingTool.detail}"` : ''}...</span>
             </div>
           )}
+
+          {isListening && (
+            <div
+              className="fade-in-up"
+              style={{
+                padding: '6px 14px',
+                marginBottom: 6,
+                borderRadius: 'var(--radius-md)',
+                background: 'rgba(239, 68, 68, 0.12)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                fontSize: '11px',
+                fontWeight: 600,
+                color: 'var(--status-error, #EF4444)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <span style={{ animation: 'pulse 1s infinite' }}>🎙️</span>
+              <span>Listening to your voice... Speak now</span>
+            </div>
+          )}
+
           <form onSubmit={(e) => { e.preventDefault(); sendMessage(input) }}>
-            <div className="chat-input-row">
-              <div className="chat-input-wrapper">
+            <div className="chat-input-row" style={{ display: 'flex', alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={toggleVoiceInput}
+                className="chat-voice-btn"
+                title={isListening ? 'Stop listening' : 'Voice input (Speak)'}
+                style={{
+                  background: isListening ? 'var(--status-error, #EF4444)' : 'var(--bg-muted)',
+                  color: isListening ? 'white' : 'var(--text-secondary)',
+                  border: 'none',
+                  borderRadius: 'var(--radius-full)',
+                  width: 38,
+                  height: 38,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                  marginRight: 6,
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <MicIcon active={isListening} />
+              </button>
+
+              <div className="chat-input-wrapper" style={{ flex: 1 }}>
                 <textarea
                   ref={inputRef}
                   id="chat-input"
@@ -624,11 +750,12 @@ export default function ChatPage() {
                   value={input}
                   onChange={(e) => { setInput(e.target.value); adjustTextareaHeight() }}
                   onKeyDown={handleKeyDown}
-                  placeholder={`Tell ${assistantName} anything...`}
+                  placeholder={isListening ? 'Listening...' : `Tell ${assistantName} anything...`}
                   rows={1}
                   disabled={isLoading && !isStreaming}
                 />
               </div>
+
               {isLoading || isStreaming ? (
                 <button
                   type="button"

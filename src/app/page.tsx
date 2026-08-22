@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import AppHeader from '@/components/layout/AppHeader'
 import BottomNav from '@/components/layout/BottomNav'
 import { format } from 'date-fns'
+import FocusTimerCard from '@/components/dashboard/FocusTimerCard'
+import { scheduleDailyMorningBriefing, requestNotificationPermission } from '@/lib/notifications/native'
 
 interface DashboardData {
   user: { name: string; timezone: string; setupDone?: boolean }
@@ -152,6 +154,10 @@ export default function HomePage() {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('srushti_onboarding_done') !== 'true') {
       setShowOnboarding(true)
     }
+
+    // Schedule 8:00 AM daily briefing
+    scheduleDailyMorningBriefing(8, 0)
+    requestNotificationPermission()
 
     fetchDashboard()
 
@@ -425,6 +431,11 @@ export default function HomePage() {
             </div>
           </div>
         )}
+
+        {/* ── ⏱️ FOCUS & POMODORO TIMER CARD ─────────────────────── */}
+        <div className="page-section">
+          <FocusTimerCard tasks={data?.today?.tasks || []} />
+        </div>
 
         {/* ── 🌅 PROACTIVE AI BRIEFING & RECOMMENDATION ─────────────────────────── */}
         {briefing?.aiRecommendation && (
