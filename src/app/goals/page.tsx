@@ -48,13 +48,16 @@ const priorityColors: Record<string, string> = {
   low: 'var(--priority-low)',
 }
 
-import { getClientGoals, createClientGoal, deleteClientGoal } from '@/lib/data/clientData'
+import { getClientGoals, createClientGoal, updateClientGoal, deleteClientGoal } from '@/lib/data/clientData'
 
 export default function GoalsPage() {
   const router = useRouter()
   const [goals, setGoals] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
+  const [activeMenuGoalId, setActiveMenuGoalId] = useState<string | null>(null)
+  const [editingGoal, setEditingGoal] = useState<any | null>(null)
+
   const [newGoal, setNewGoal] = useState({
     title: '',
     description: '',
@@ -115,8 +118,41 @@ export default function GoalsPage() {
       }),
     }).catch(() => {})
 
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('srushti_data_changed'))
+    }
+
     setNewGoal({ title: '', description: '', category: 'study', priority: 'high', targetDate: '' })
     setShowAdd(false)
+    fetchGoals()
+  }
+
+  const handleDeleteGoal = async (id: string, title: string) => {
+    if (confirm(`⚠️ Are you sure you want to permanently delete goal:\n"${title}"?`)) {
+      await deleteClientGoal(id).catch(() => {})
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('srushti_data_changed'))
+      }
+      fetchGoals()
+    }
+  }
+
+  const handleSaveEditGoal = async () => {
+    if (!editingGoal || !editingGoal.title.trim()) return
+    await updateClientGoal(editingGoal.id, {
+      title: editingGoal.title,
+      description: editingGoal.description,
+      category: editingGoal.category,
+      priority: editingGoal.priority,
+      progress: Number(editingGoal.progress) || 0,
+      targetDate: editingGoal.targetDate ? new Date(editingGoal.targetDate).toISOString() : undefined,
+    }).catch(() => {})
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('srushti_data_changed'))
+    }
+
+    setEditingGoal(null)
     fetchGoals()
   }
 
@@ -287,19 +323,117 @@ export default function GoalsPage() {
                         </div>
                       </div>
 
-                      <span
-                        style={{
-                          fontSize: '10px',
-                          fontWeight: 700,
-                          color: priorityColors[goal.priority] || 'var(--brand-primary)',
-                          background: (priorityColors[goal.priority] || '#6366F1') + '15',
-                          padding: '2px 8px',
-                          borderRadius: 'var(--radius-full)',
-                          textTransform: 'uppercase',
-                        }}
-                      >
-                        {goal.priority}
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }}>
+                        <span
+                          style={{
+                            fontSize: '10px',
+                            fontWeight: 700,
+                            color: priorityColors[goal.priority] || 'var(--brand-primary)',
+                            background: (priorityColors[goal.priority] || '#6366F1') + '15',
+                            padding: '2px 8px',
+                            borderRadius: 'var(--radius-full)',
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          {goal.priority}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setActiveMenuGoalId(activeMenuGoalId === goal.id ? null : goal.id)
+                          }}
+                          style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: 'var(--radius-full)',
+                            border: '1px solid var(--border-default)',
+                            background: 'var(--bg-subtle)',
+                            color: 'var(--text-primary)',
+                            fontSize: '16px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                          }}
+                          title="Options"
+                        >
+                          ⋮
+                        </button>
+
+                        {activeMenuGoalId === goal.id && (
+                          <div
+                            className="card fade-in-up"
+                            style={{
+                              position: 'absolute',
+                              top: 'calc(100% + 4px)',
+                              right: 0,
+                              zIndex: 50,
+                              minWidth: 140,
+                              padding: 4,
+                              borderRadius: 'var(--radius-lg)',
+                              boxShadow: 'var(--shadow-xl)',
+                              background: 'var(--bg-surface)',
+                              border: '1px solid var(--border-default)',
+                            }}
+                          >
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setEditingGoal({ ...goal })
+                                setActiveMenuGoalId(null)
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '8px 12px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 6,
+                                border: 'none',
+                                background: 'transparent',
+                                color: 'var(--text-primary)',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                borderRadius: 'var(--radius-md)',
+                              }}
+                            >
+                              <span>✏️</span>
+                              <span>Edit Goal</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setActiveMenuGoalId(null)
+                                handleDeleteGoal(goal.id, goal.title)
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '8px 12px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 6,
+                                border: 'none',
+                                background: 'transparent',
+                                color: 'var(--status-error, #EF4444)',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                borderRadius: 'var(--radius-md)',
+                              }}
+                            >
+                              <span>🗑️</span>
+                              <span>Delete Goal</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Description */}
@@ -421,6 +555,145 @@ export default function GoalsPage() {
               <button className="btn btn-primary btn-full" onClick={addGoal}>
                 Save Goal
               </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── EDIT GOAL BOTTOM SHEET ─────────────────────────── */}
+      {editingGoal && (
+        <>
+          <div className="sheet-overlay" onClick={() => setEditingGoal(null)} />
+          <div className="bottom-sheet">
+            <div className="sheet-handle" />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 700 }}>
+                ✏️ Edit Goal
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingGoal(null)}
+                style={{ border: 'none', background: 'none', fontSize: 18, color: 'var(--text-tertiary)', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+              <div className="input-group">
+                <label className="input-label">Goal Title</label>
+                <input
+                  className="input"
+                  value={editingGoal.title || ''}
+                  onChange={e => setEditingGoal((p: any) => ({ ...p, title: e.target.value }))}
+                />
+              </div>
+
+              <div className="input-group">
+                <label className="input-label">Category</label>
+                <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                  {['study', 'career', 'health', 'learning', 'finance', 'personal'].map(c => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setEditingGoal((p: any) => ({ ...p, category: c }))}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: 'var(--radius-full)',
+                        fontSize: 'var(--text-xs)',
+                        fontWeight: 700,
+                        textTransform: 'capitalize',
+                        background: editingGoal.category === c ? 'var(--brand-primary)' : 'var(--bg-muted)',
+                        color: editingGoal.category === c ? 'white' : 'var(--text-secondary)',
+                        border: 'none',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {categoryIcons[c]} {c}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="input-group">
+                <label className="input-label">Priority</label>
+                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                  {['critical', 'high', 'medium', 'low'].map(pr => (
+                    <button
+                      key={pr}
+                      type="button"
+                      onClick={() => setEditingGoal((p: any) => ({ ...p, priority: pr }))}
+                      style={{
+                        flex: 1,
+                        padding: '6px 0',
+                        borderRadius: 'var(--radius-md)',
+                        fontSize: 'var(--text-xs)',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        background: editingGoal.priority === pr ? (priorityColors[pr] || 'var(--brand-primary)') : 'var(--bg-muted)',
+                        color: editingGoal.priority === pr ? 'white' : 'var(--text-secondary)',
+                        border: 'none',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {pr}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="input-group">
+                <label className="input-label">Progress: {editingGoal.progress || 0}%</label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={editingGoal.progress || 0}
+                  onChange={e => setEditingGoal((p: any) => ({ ...p, progress: Number(e.target.value) }))}
+                  style={{ width: '100%' }}
+                />
+              </div>
+
+              <div className="input-group">
+                <label className="input-label">Target Completion Date</label>
+                <input
+                  type="date"
+                  className="input"
+                  value={editingGoal.targetDate ? editingGoal.targetDate.split('T')[0] : ''}
+                  onChange={e => setEditingGoal((p: any) => ({ ...p, targetDate: e.target.value }))}
+                />
+              </div>
+
+              <div className="input-group">
+                <label className="input-label">Motivation / Description</label>
+                <textarea
+                  className="input"
+                  rows={2}
+                  value={editingGoal.description || ''}
+                  onChange={e => setEditingGoal((p: any) => ({ ...p, description: e.target.value }))}
+                  style={{ resize: 'none' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 4 }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ flex: 1 }}
+                  onClick={() => setEditingGoal(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ flex: 2 }}
+                  onClick={handleSaveEditGoal}
+                >
+                  💾 Save Changes
+                </button>
+              </div>
             </div>
           </div>
         </>

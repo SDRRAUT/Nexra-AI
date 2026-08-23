@@ -5,7 +5,13 @@ import { useRouter } from 'next/navigation'
 import AppHeader from '@/components/layout/AppHeader'
 import BottomNav from '@/components/layout/BottomNav'
 import { format, subDays, isSameDay } from 'date-fns'
-import { getClientHabits, toggleClientHabit, createClientHabit } from '@/lib/data/clientData'
+import {
+  getClientHabits,
+  toggleClientHabit,
+  createClientHabit,
+  updateClientHabit,
+  deleteClientHabit,
+} from '@/lib/data/clientData'
 
 interface Habit {
   id: string
@@ -31,6 +37,9 @@ export default function HabitsPage() {
   const [todayLogs, setTodayLogs] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
+  const [activeMenuHabitId, setActiveMenuHabitId] = useState<string | null>(null)
+  const [editingHabit, setEditingHabit] = useState<any | null>(null)
+
   const [newHabit, setNewHabit] = useState({
     title: '',
     frequency: 'daily',
@@ -97,6 +106,32 @@ export default function HabitsPage() {
       }),
     }).catch(() => {})
 
+    fetchHabits()
+  }
+
+  const handleDeleteHabit = async (id: string, title: string) => {
+    if (confirm(`Delete habit "${title}"?`)) {
+      await deleteClientHabit(id).catch(() => {})
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('srushti_data_changed'))
+      }
+      fetchHabits()
+    }
+  }
+
+  const handleSaveEditHabit = async () => {
+    if (!editingHabit || !editingHabit.title.trim()) return
+    await updateClientHabit(editingHabit.id, {
+      title: editingHabit.title,
+      frequency: editingHabit.frequency,
+      scheduledTime: editingHabit.scheduledTime,
+      category: editingHabit.category,
+    }).catch(() => {})
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('srushti_data_changed'))
+    }
+    setEditingHabit(null)
     fetchHabits()
   }
 
@@ -256,26 +291,124 @@ export default function HabitsPage() {
                         </div>
                       </div>
 
-                      {/* Streak Badge */}
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 4,
-                          background: habit.currentStreak > 0 ? 'rgba(245, 158, 11, 0.12)' : 'var(--bg-subtle)',
-                          padding: '4px 10px',
-                          borderRadius: 'var(--radius-full)',
-                          border: `1px solid ${habit.currentStreak > 0 ? 'rgba(245, 158, 11, 0.25)' : 'var(--border-subtle)'}`,
-                        }}
-                      >
-                        <span style={{ fontSize: 14 }}>🔥</span>
-                        <span style={{
-                          fontSize: 'var(--text-xs)',
-                          fontWeight: 800,
-                          color: habit.currentStreak > 0 ? 'var(--brand-warm)' : 'var(--text-tertiary)',
-                        }}>
-                          {habit.currentStreak}d
-                        </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }}>
+                        {/* Streak Badge */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            background: habit.currentStreak > 0 ? 'rgba(245, 158, 11, 0.12)' : 'var(--bg-subtle)',
+                            padding: '4px 10px',
+                            borderRadius: 'var(--radius-full)',
+                            border: `1px solid ${habit.currentStreak > 0 ? 'rgba(245, 158, 11, 0.25)' : 'var(--border-subtle)'}`,
+                          }}
+                        >
+                          <span style={{ fontSize: 14 }}>🔥</span>
+                          <span style={{
+                            fontSize: 'var(--text-xs)',
+                            fontWeight: 800,
+                            color: habit.currentStreak > 0 ? 'var(--brand-warm)' : 'var(--text-tertiary)',
+                          }}>
+                            {habit.currentStreak}d
+                          </span>
+                        </div>
+
+                        {/* 3-dots Menu Button */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setActiveMenuHabitId(activeMenuHabitId === habit.id ? null : habit.id)
+                          }}
+                          style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: 'var(--radius-full)',
+                            border: '1px solid var(--border-default)',
+                            background: 'var(--bg-subtle)',
+                            color: 'var(--text-primary)',
+                            fontSize: '16px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          ⋮
+                        </button>
+
+                        {activeMenuHabitId === habit.id && (
+                          <div
+                            className="card fade-in-up"
+                            style={{
+                              position: 'absolute',
+                              top: 'calc(100% + 4px)',
+                              right: 0,
+                              zIndex: 50,
+                              minWidth: 130,
+                              padding: 4,
+                              borderRadius: 'var(--radius-lg)',
+                              boxShadow: 'var(--shadow-xl)',
+                              background: 'var(--bg-surface)',
+                              border: '1px solid var(--border-default)',
+                            }}
+                          >
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setEditingHabit({ ...habit })
+                                setActiveMenuHabitId(null)
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '8px 10px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 6,
+                                border: 'none',
+                                background: 'transparent',
+                                color: 'var(--text-primary)',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                borderRadius: 'var(--radius-md)',
+                              }}
+                            >
+                              <span>✏️</span>
+                              <span>Edit Habit</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setActiveMenuHabitId(null)
+                                handleDeleteHabit(habit.id, habit.title)
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '8px 10px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 6,
+                                border: 'none',
+                                background: 'transparent',
+                                color: 'var(--status-error, #EF4444)',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                borderRadius: 'var(--radius-md)',
+                              }}
+                            >
+                              <span>🗑️</span>
+                              <span>Delete</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -392,6 +525,96 @@ export default function HabitsPage() {
               <button className="btn btn-primary btn-full" onClick={handleAddHabit}>
                 Start Habit Streak
               </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── EDIT HABIT BOTTOM SHEET ─────────────────────────── */}
+      {editingHabit && (
+        <>
+          <div className="sheet-overlay" onClick={() => setEditingHabit(null)} />
+          <div className="bottom-sheet">
+            <div className="sheet-handle" />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 700 }}>
+                ✏️ Edit Habit
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingHabit(null)}
+                style={{ border: 'none', background: 'none', fontSize: 18, color: 'var(--text-tertiary)', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+              <div className="input-group">
+                <label className="input-label">Habit Title</label>
+                <input
+                  className="input"
+                  value={editingHabit.title || ''}
+                  onChange={e => setEditingHabit((p: any) => ({ ...p, title: e.target.value }))}
+                  autoFocus
+                />
+              </div>
+
+              <div className="input-group">
+                <label className="input-label">Frequency</label>
+                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                  {['daily', 'weekdays', 'weekends'].map(f => (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => setEditingHabit((p: any) => ({ ...p, frequency: f }))}
+                      style={{
+                        flex: 1,
+                        padding: '8px',
+                        borderRadius: 'var(--radius-md)',
+                        fontSize: 'var(--text-xs)',
+                        fontWeight: 700,
+                        textTransform: 'capitalize',
+                        background: editingHabit.frequency === f ? 'var(--brand-primary)' : 'var(--bg-muted)',
+                        color: editingHabit.frequency === f ? 'white' : 'var(--text-secondary)',
+                        border: 'none',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="input-group">
+                <label className="input-label">Preferred Time</label>
+                <input
+                  type="time"
+                  className="input"
+                  value={editingHabit.scheduledTime || '08:00'}
+                  onChange={e => setEditingHabit((p: any) => ({ ...p, scheduledTime: e.target.value }))}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 4 }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ flex: 1 }}
+                  onClick={() => setEditingHabit(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ flex: 2 }}
+                  onClick={handleSaveEditHabit}
+                >
+                  💾 Save Changes
+                </button>
+              </div>
             </div>
           </div>
         </>

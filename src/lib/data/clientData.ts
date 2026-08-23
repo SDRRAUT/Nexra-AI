@@ -139,6 +139,10 @@ export async function createClientGoal(goal: Partial<LocalGoal>): Promise<LocalG
   return newGoal
 }
 
+export async function updateClientGoal(id: string, updates: Partial<LocalGoal>): Promise<void> {
+  await localDb.goals.update(id, updates)
+}
+
 export async function deleteClientGoal(id: string): Promise<void> {
   await localDb.goals.delete(id)
 }
@@ -166,8 +170,13 @@ export async function createClientHabit(habit: Partial<LocalHabit>): Promise<Loc
   return newHabit
 }
 
+export async function updateClientHabit(id: string, updates: Partial<LocalHabit>): Promise<void> {
+  await localDb.habits.update(id, updates)
+}
+
 export async function deleteClientHabit(id: string): Promise<void> {
   await localDb.habits.delete(id)
+  await localDb.habitLogs.where('habitId').equals(id).delete().catch(() => {})
 }
 
 export async function toggleClientHabit(id: string, completed: boolean): Promise<void> {

@@ -26,6 +26,8 @@ export default function MemoryPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
   const [showAdd, setShowAdd] = useState(false)
+  const [activeMenuMemoryId, setActiveMenuMemoryId] = useState<string | null>(null)
+  const [editingMemory, setEditingMemory] = useState<any | null>(null)
   const [newMemory, setNewMemory] = useState({ content: '', category: 'fact', importance: 'medium' })
 
   const fetchMemories = async () => {
@@ -52,11 +54,29 @@ export default function MemoryPage() {
   }, [])
 
   const deleteMemory = async (id: string, content: string) => {
-    if (confirm(`⚠️ Are you sure you want to permanently delete this memory:\n"${content.slice(0, 50)}..."?`)) {
+    if (confirm(`⚠️ Delete memory:\n"${content.slice(0, 60)}..."?`)) {
       await localDb.memories.delete(id).catch(() => {})
       await fetch('/api/memory', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) }).catch(() => {})
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('srushti_data_changed'))
+      }
       fetchMemories()
     }
+  }
+
+  const handleSaveEditMemory = async () => {
+    if (!editingMemory || !editingMemory.content.trim()) return
+    await localDb.memories.update(editingMemory.id, {
+      content: editingMemory.content,
+      category: editingMemory.category,
+      importance: editingMemory.importance,
+    }).catch(() => {})
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('srushti_data_changed'))
+    }
+    setEditingMemory(null)
+    fetchMemories()
   }
 
   const addMemory = async () => {
@@ -72,6 +92,9 @@ export default function MemoryPage() {
     }).catch(() => {})
 
     await fetch('/api/memory', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newMemory) }).catch(() => {})
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('srushti_data_changed'))
+    }
     setNewMemory({ content: '', category: 'fact', importance: 'medium' })
     setShowAdd(false)
     fetchMemories()
@@ -90,7 +113,7 @@ export default function MemoryPage() {
           <div style={{ background: 'linear-gradient(135deg, rgba(236,72,153,0.08), rgba(139,92,246,0.08))', border: '1px solid rgba(236,72,153,0.15)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-4)', marginBottom: 'var(--space-5)' }}>
             <div style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--text-primary)' }}>🧠 What Srushti remembers</div>
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginTop: 4 }}>
-              Srushti uses these memories to understand your context and give better answers. You can delete any memory at any time.
+              Srushti uses these memories to understand your context and give better answers. You can edit or delete any memory at any time.
             </div>
           </div>
 
@@ -144,13 +167,98 @@ export default function MemoryPage() {
                         {format(new Date(memory.createdAt), 'MMM d, yyyy')} · Accessed {memory.accessCount} times
                       </div>
                     </div>
-                    <button
-                      onClick={() => deleteMemory(memory.id, memory.content)}
-                      style={{ color: 'var(--text-tertiary)', fontSize: 18, padding: 4, flexShrink: 0 }}
-                      id={`delete-memory-${memory.id}`}
-                    >
-                      ×
-                    </button>
+
+                    <div style={{ position: 'relative' }}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setActiveMenuMemoryId(activeMenuMemoryId === memory.id ? null : memory.id)
+                        }}
+                        style={{
+                          padding: '4px 8px',
+                          color: 'var(--text-tertiary)',
+                          fontSize: 16,
+                          border: 'none',
+                          background: 'transparent',
+                          cursor: 'pointer',
+                        }}
+                        id={`menu-memory-${memory.id}`}
+                      >
+                        ⋮
+                      </button>
+
+                      {activeMenuMemoryId === memory.id && (
+                        <div
+                          className="card fade-in-up"
+                          style={{
+                            position: 'absolute',
+                            top: 'calc(100% + 2px)',
+                            right: 0,
+                            zIndex: 50,
+                            minWidth: 130,
+                            padding: 4,
+                            borderRadius: 'var(--radius-lg)',
+                            boxShadow: 'var(--shadow-xl)',
+                            background: 'var(--bg-surface)',
+                            border: '1px solid var(--border-default)',
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setEditingMemory({ ...memory })
+                              setActiveMenuMemoryId(null)
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '8px 10px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              border: 'none',
+                              background: 'transparent',
+                              color: 'var(--text-primary)',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                              borderRadius: 'var(--radius-md)',
+                            }}
+                          >
+                            <span>✏️</span>
+                            <span>Edit</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setActiveMenuMemoryId(null)
+                              deleteMemory(memory.id, memory.content)
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '8px 10px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              border: 'none',
+                              background: 'transparent',
+                              color: 'var(--status-error, #EF4444)',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                              borderRadius: 'var(--radius-md)',
+                            }}
+                          >
+                            <span>🗑️</span>
+                            <span>Delete</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -169,7 +277,7 @@ export default function MemoryPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
               <div className="input-group">
                 <label className="input-label">What should Srushti remember?</label>
-                <textarea className="input" rows={3} placeholder="e.g. I have CAO exam on September 12..." value={newMemory.content} onChange={e => setNewMemory(p => ({ ...p, content: e.target.value }))} style={{ resize: 'none' }} />
+                <textarea className="input" rows={3} placeholder="e.g. I prefer studying in 25-minute intervals..." value={newMemory.content} onChange={e => setNewMemory(p => ({ ...p, content: e.target.value }))} style={{ resize: 'none' }} />
               </div>
               <div className="input-group">
                 <label className="input-label">Category</label>
@@ -177,13 +285,75 @@ export default function MemoryPage() {
                   {['fact', 'goal', 'commitment', 'preference', 'deadline', 'pattern', 'decision'].map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
+              <button className="btn btn-primary btn-full" onClick={addMemory}>Save Memory</button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Edit Memory Sheet */}
+      {editingMemory && (
+        <>
+          <div className="sheet-overlay" onClick={() => setEditingMemory(null)} />
+          <div className="bottom-sheet">
+            <div className="sheet-handle" />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 700 }}>
+                ✏️ Edit Memory
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingMemory(null)}
+                style={{ border: 'none', background: 'none', fontSize: 18, color: 'var(--text-tertiary)', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
               <div className="input-group">
-                <label className="input-label">Importance</label>
-                <select className="input" value={newMemory.importance} onChange={e => setNewMemory(p => ({ ...p, importance: e.target.value }))}>
-                  {['low', 'medium', 'high', 'critical'].map(i => <option key={i} value={i}>{i}</option>)}
+                <label className="input-label">Memory Content</label>
+                <textarea
+                  className="input"
+                  rows={3}
+                  value={editingMemory.content || ''}
+                  onChange={e => setEditingMemory((p: any) => ({ ...p, content: e.target.value }))}
+                  style={{ resize: 'none' }}
+                  autoFocus
+                />
+              </div>
+
+              <div className="input-group">
+                <label className="input-label">Category</label>
+                <select
+                  className="input"
+                  value={editingMemory.category || 'fact'}
+                  onChange={e => setEditingMemory((p: any) => ({ ...p, category: e.target.value }))}
+                >
+                  {['fact', 'goal', 'commitment', 'preference', 'deadline', 'pattern', 'decision'].map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
                 </select>
               </div>
-              <button className="btn btn-primary btn-full" onClick={addMemory}>Save Memory</button>
+
+              <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 4 }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ flex: 1 }}
+                  onClick={() => setEditingMemory(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ flex: 2 }}
+                  onClick={handleSaveEditMemory}
+                >
+                  💾 Save Changes
+                </button>
+              </div>
             </div>
           </div>
         </>

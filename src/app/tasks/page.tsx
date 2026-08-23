@@ -11,6 +11,7 @@ import {
   toggleClientTask,
   deleteClientTask,
   createClientTask,
+  updateClientTask,
 } from '@/lib/data/clientData'
 
 interface Task {
@@ -34,6 +35,8 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<string>('all')
   const [showAddSheet, setShowAddSheet] = useState(false)
+  const [activeMenuTaskId, setActiveMenuTaskId] = useState<string | null>(null)
+  const [editingTask, setEditingTask] = useState<any | null>(null)
   const [newTask, setNewTask] = useState({ title: '', priority: 'medium', category: '' })
 
   const fetchTasks = async () => {
@@ -84,9 +87,32 @@ export default function TasksPage() {
     fetchTasks()
   }
 
-  const handleDelete = async (id: string) => {
-    await deleteClientTask(id).catch(() => {})
-    await fetch(`/api/tasks/${id}`, { method: 'DELETE' }).catch(() => {})
+  const handleDelete = async (id: string, title?: string) => {
+    if (confirm(`Delete task "${title || 'this task'}"?`)) {
+      await deleteClientTask(id).catch(() => {})
+      await fetch(`/api/tasks/${id}`, { method: 'DELETE' }).catch(() => {})
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('srushti_data_changed'))
+      }
+      fetchTasks()
+    }
+  }
+
+  const handleSaveEditTask = async () => {
+    if (!editingTask || !editingTask.title.trim()) return
+    await updateClientTask(editingTask.id, {
+      title: editingTask.title,
+      priority: editingTask.priority,
+      category: editingTask.category,
+      estimatedMinutes: Number(editingTask.estimatedMinutes) || 30,
+      scheduledStart: editingTask.scheduledStart || undefined,
+      deadline: editingTask.deadline || undefined,
+    }).catch(() => {})
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('srushti_data_changed'))
+    }
+    setEditingTask(null)
     fetchTasks()
   }
 
@@ -98,6 +124,11 @@ export default function TasksPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newTask),
     }).catch(() => {})
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('srushti_data_changed'))
+    }
+
     setNewTask({ title: '', priority: 'medium', category: '' })
     setShowAddSheet(false)
     fetchTasks()
@@ -203,13 +234,99 @@ export default function TasksPage() {
                       {task.isAiGenerated && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--brand-primary)' }}>🌱 AI</span>}
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleDelete(task.id)}
-                    style={{ padding: 4, color: 'var(--text-tertiary)', flexShrink: 0, fontSize: 18 }}
-                    id={`delete-task-${task.id}`}
-                  >
-                    ×
-                  </button>
+                  <div style={{ position: 'relative' }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setActiveMenuTaskId(activeMenuTaskId === task.id ? null : task.id)
+                      }}
+                      style={{
+                        padding: '4px 8px',
+                        color: 'var(--text-tertiary)',
+                        flexShrink: 0,
+                        fontSize: 16,
+                        border: 'none',
+                        background: 'transparent',
+                        cursor: 'pointer',
+                        borderRadius: 'var(--radius-sm)',
+                      }}
+                      id={`menu-task-${task.id}`}
+                    >
+                      ⋮
+                    </button>
+
+                    {activeMenuTaskId === task.id && (
+                      <div
+                        className="card fade-in-up"
+                        style={{
+                          position: 'absolute',
+                          top: 'calc(100% + 2px)',
+                          right: 0,
+                          zIndex: 50,
+                          minWidth: 130,
+                          padding: 4,
+                          borderRadius: 'var(--radius-lg)',
+                          boxShadow: 'var(--shadow-xl)',
+                          background: 'var(--bg-surface)',
+                          border: '1px solid var(--border-default)',
+                        }}
+                      >
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setEditingTask({ ...task })
+                            setActiveMenuTaskId(null)
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '8px 10px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            border: 'none',
+                            background: 'transparent',
+                            color: 'var(--text-primary)',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            borderRadius: 'var(--radius-md)',
+                          }}
+                        >
+                          <span>✏️</span>
+                          <span>Edit Task</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setActiveMenuTaskId(null)
+                            handleDelete(task.id, task.title)
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '8px 10px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            border: 'none',
+                            background: 'transparent',
+                            color: 'var(--status-error, #EF4444)',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            borderRadius: 'var(--radius-md)',
+                          }}
+                        >
+                          <span>🗑️</span>
+                          <span>Delete</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -271,6 +388,106 @@ export default function TasksPage() {
               <button className="btn btn-ghost btn-full" onClick={() => { setShowAddSheet(false); router.push('/chat') }}>
                 Or tell Srushti instead
               </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Edit Task Bottom Sheet */}
+      {editingTask && (
+        <>
+          <div className="sheet-overlay" onClick={() => setEditingTask(null)} />
+          <div className="bottom-sheet">
+            <div className="sheet-handle" />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 700 }}>
+                ✏️ Edit Task
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingTask(null)}
+                style={{ border: 'none', background: 'none', fontSize: 18, color: 'var(--text-tertiary)', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+              <div className="input-group">
+                <label className="input-label">Task Title</label>
+                <input
+                  className="input"
+                  value={editingTask.title || ''}
+                  onChange={e => setEditingTask((p: any) => ({ ...p, title: e.target.value }))}
+                  autoFocus
+                />
+              </div>
+
+              <div className="input-group">
+                <label className="input-label">Priority</label>
+                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                  {['critical', 'high', 'medium', 'low'].map(p => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setEditingTask((prev: any) => ({ ...prev, priority: p }))}
+                      style={{
+                        flex: 1,
+                        padding: 'var(--space-2)',
+                        borderRadius: 'var(--radius-md)',
+                        fontSize: 'var(--text-xs)',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        background: editingTask.priority === p ? priorityColors[p] : priorityBg[p],
+                        color: editingTask.priority === p ? 'white' : priorityColors[p],
+                        border: `1.5px solid ${priorityColors[p]}`,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="input-group">
+                <label className="input-label">Category</label>
+                <input
+                  className="input"
+                  placeholder="study, work, health, general..."
+                  value={editingTask.category || ''}
+                  onChange={e => setEditingTask((p: any) => ({ ...p, category: e.target.value }))}
+                />
+              </div>
+
+              <div className="input-group">
+                <label className="input-label">Estimated Minutes</label>
+                <input
+                  type="number"
+                  className="input"
+                  value={editingTask.estimatedMinutes || 30}
+                  onChange={e => setEditingTask((p: any) => ({ ...p, estimatedMinutes: Number(e.target.value) }))}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 4 }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ flex: 1 }}
+                  onClick={() => setEditingTask(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ flex: 2 }}
+                  onClick={handleSaveEditTask}
+                >
+                  💾 Save Changes
+                </button>
+              </div>
             </div>
           </div>
         </>

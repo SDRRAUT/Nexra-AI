@@ -112,7 +112,10 @@ export class VoiceEngine {
   }
 
   public stopListening() {
-    if (this.recognition && this.isListening) {
+    if (this.recognition) {
+      try {
+        this.recognition.abort()
+      } catch {}
       try {
         this.recognition.stop()
       } catch {}
@@ -127,7 +130,9 @@ export class VoiceEngine {
     if (!this.synth) return
 
     // Cancel any ongoing speech
-    this.synth.cancel()
+    try {
+      this.synth.cancel()
+    } catch {}
 
     // Clean markdown tags & symbols before speaking
     const cleanText = text
@@ -142,20 +147,30 @@ export class VoiceEngine {
     if (this.selectedVoice) {
       utterance.voice = this.selectedVoice
     }
-    utterance.rate = 1.05
-    utterance.pitch = 1.02
+    utterance.rate = 1.05 // Slightly energetic pace
+    utterance.pitch = 1.0
 
-    if (onEnd) {
-      utterance.onend = onEnd
-      utterance.onerror = onEnd
+    utterance.onend = () => {
+      if (onEnd) onEnd()
     }
 
-    this.synth.speak(utterance)
+    utterance.onerror = () => {
+      if (onEnd) onEnd()
+    }
+
+    try {
+      this.synth.speak(utterance)
+    } catch (e) {
+      console.warn('TTS error:', e)
+      if (onEnd) onEnd()
+    }
   }
 
   public stopSpeaking() {
     if (this.synth) {
-      this.synth.cancel()
+      try {
+        this.synth.cancel()
+      } catch {}
     }
   }
 }

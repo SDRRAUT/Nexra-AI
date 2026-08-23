@@ -140,6 +140,11 @@ export default function ChatPage() {
         (err) => {
           console.warn('Voice error:', err)
           setIsListening(false)
+          if (err === 'not-allowed' || err.includes('permission')) {
+            alert('🎙️ Microphone access was blocked. Please grant Microphone permission in your phone settings.')
+          } else if (err !== 'no-speech') {
+            console.log('Voice status:', err)
+          }
         },
         () => {
           setIsListening(false)

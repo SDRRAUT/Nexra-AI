@@ -266,8 +266,8 @@ Always speak directly, warmly, and helpfully as ${assistantName}. Keep answers f
     topP: 0.95,
   }
 
-  // Ultra-fast response models in order of instant speed
-  const candidateModels = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash']
+  // Reliable production models in order of speed and compatibility
+  const candidateModels = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro']
   let response: Response | null = null
   let lastErr = ''
 
@@ -286,7 +286,13 @@ Always speak directly, warmly, and helpfully as ${assistantName}. Keep answers f
         response = res
         break
       } else {
-        lastErr = await res.text()
+        const textErr = await res.text().catch(() => '')
+        try {
+          const jsonErr = JSON.parse(textErr)
+          lastErr = jsonErr?.error?.message || `HTTP ${res.status}`
+        } catch {
+          lastErr = textErr || `HTTP ${res.status}`
+        }
       }
     } catch (e: any) {
       if (e.name === 'AbortError') {
@@ -297,7 +303,7 @@ Always speak directly, warmly, and helpfully as ${assistantName}. Keep answers f
   }
 
   if (!response || !response.ok) {
-    throw new Error(`Gemini API error: ${lastErr || 'Failed to connect'}`)
+    throw new Error(`${lastErr || 'Failed to connect to Google Gemini API. Please check your API key in Settings.'}`)
   }
 
   const reader = response.body?.getReader()
