@@ -2,13 +2,12 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'SRUSHTI — My Personal Assistant',
+  title: 'Personal Assistant',
   description: 'Your intelligent AI Personal PA that manages your time, tracks your commitments, and keeps your life moving toward your goals.',
-  manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'SRUSHTI',
+    title: 'Personal Assistant',
   },
   formatDetection: { telephone: false },
 }

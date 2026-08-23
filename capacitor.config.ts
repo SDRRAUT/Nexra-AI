@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli'
 
 const config: CapacitorConfig = {
   appId: 'com.sdr.srushtiai',
-  appName: 'Srushti AI',
+  appName: 'Personal Assistant',
   webDir: 'out',
   server: {
     androidScheme: 'https',

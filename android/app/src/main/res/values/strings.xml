@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Srushti AI</string>
-    <string name="title_activity_main">Srushti AI</string>
+    <string name="app_name">Personal Assistant</string>
+    <string name="title_activity_main">Personal Assistant</string>
     <string name="package_name">com.sdr.srushtiai</string>
     <string name="custom_url_scheme">com.sdr.srushtiai</string>
 </resources>
