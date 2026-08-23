@@ -1,4 +1,4 @@
-import { localDb, ensureInitialData, type LocalTask, type LocalGoal, type LocalHabit, type LocalEvent, type LocalMemory } from '@/lib/db/localDb'
+import { localDb, ensureInitialData, type LocalTask, type LocalGoal, type LocalHabit, type LocalHabitLog, type LocalEvent, type LocalMemory } from '@/lib/db/localDb'
 
 export interface DashboardData {
   user: {
@@ -80,6 +80,12 @@ export async function getClientDashboard(): Promise<DashboardData> {
   }
 }
 
+function notifyDataChanged() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('srushti_data_changed'))
+  }
+}
+
 // ── 2. TASKS CRUD ─────────────────────────────────────────────
 export async function getClientTasks(): Promise<LocalTask[]> {
   await ensureInitialData()
@@ -99,11 +105,13 @@ export async function createClientTask(task: Partial<LocalTask>): Promise<LocalT
     ...task,
   }
   await localDb.tasks.add(newTask)
+  notifyDataChanged()
   return newTask
 }
 
 export async function updateClientTask(id: string, updates: Partial<LocalTask>): Promise<void> {
   await localDb.tasks.update(id, updates)
+  notifyDataChanged()
 }
 
 export async function toggleClientTask(id: string, completed: boolean): Promise<void> {
@@ -111,10 +119,12 @@ export async function toggleClientTask(id: string, completed: boolean): Promise<
     status: completed ? 'completed' : 'planned',
     completedAt: completed ? new Date().toISOString() : undefined,
   })
+  notifyDataChanged()
 }
 
 export async function deleteClientTask(id: string): Promise<void> {
   await localDb.tasks.delete(id)
+  notifyDataChanged()
 }
 
 // ── 3. GOALS CRUD ─────────────────────────────────────────────
@@ -136,21 +146,29 @@ export async function createClientGoal(goal: Partial<LocalGoal>): Promise<LocalG
     ...goal,
   }
   await localDb.goals.add(newGoal)
+  notifyDataChanged()
   return newGoal
 }
 
 export async function updateClientGoal(id: string, updates: Partial<LocalGoal>): Promise<void> {
   await localDb.goals.update(id, updates)
+  notifyDataChanged()
 }
 
 export async function deleteClientGoal(id: string): Promise<void> {
   await localDb.goals.delete(id)
+  notifyDataChanged()
 }
 
 // ── 4. HABITS CRUD ────────────────────────────────────────────
 export async function getClientHabits(): Promise<LocalHabit[]> {
   await ensureInitialData()
   return localDb.habits.toArray()
+}
+
+export async function getClientHabitLogs(): Promise<LocalHabitLog[]> {
+  await ensureInitialData()
+  return localDb.habitLogs.toArray()
 }
 
 export async function createClientHabit(habit: Partial<LocalHabit>): Promise<LocalHabit> {
@@ -167,31 +185,52 @@ export async function createClientHabit(habit: Partial<LocalHabit>): Promise<Loc
     ...habit,
   }
   await localDb.habits.add(newHabit)
+  notifyDataChanged()
   return newHabit
 }
 
 export async function updateClientHabit(id: string, updates: Partial<LocalHabit>): Promise<void> {
   await localDb.habits.update(id, updates)
+  notifyDataChanged()
 }
 
 export async function deleteClientHabit(id: string): Promise<void> {
   await localDb.habits.delete(id)
   await localDb.habitLogs.where('habitId').equals(id).delete().catch(() => {})
+  notifyDataChanged()
 }
 
-export async function toggleClientHabit(id: string, completed: boolean): Promise<void> {
+export async function toggleClientHabit(id: string, completed: boolean, dateStr?: string): Promise<void> {
   const habit = await localDb.habits.get(id)
   if (!habit) return
 
+  const targetDate = dateStr || new Date().toISOString().split('T')[0]
+
+  if (completed) {
+    const existing = await localDb.habitLogs.where('habitId').equals(id).filter(l => l.date === targetDate).first().catch(() => null)
+    if (!existing) {
+      await localDb.habitLogs.add({
+        id: `hlog-${id}-${targetDate}-${Date.now()}`,
+        habitId: id,
+        date: targetDate,
+        status: 'completed',
+        createdAt: new Date().toISOString(),
+      }).catch(() => {})
+    }
+  } else {
+    await localDb.habitLogs.where('habitId').equals(id).filter(l => l.date === targetDate).delete().catch(() => {})
+  }
+
   const newStreak = completed ? habit.currentStreak + 1 : Math.max(0, habit.currentStreak - 1)
   const newLongest = Math.max(habit.longestStreak, newStreak)
-  const newTotal = completed ? habit.totalCompleted + 1 : habit.totalCompleted
+  const newTotal = completed ? habit.totalCompleted + 1 : Math.max(0, habit.totalCompleted - 1)
 
   await localDb.habits.update(id, {
     currentStreak: newStreak,
     longestStreak: newLongest,
     totalCompleted: newTotal,
   })
+  notifyDataChanged()
 }
 
 // ── 5. MEMORIES CRUD ──────────────────────────────────────────
@@ -210,11 +249,13 @@ export async function createClientMemory(content: string, category: string = 'pr
     createdAt: new Date().toISOString(),
   }
   await localDb.memories.add(newMem)
+  notifyDataChanged()
   return newMem
 }
 
 export async function deleteClientMemory(id: string): Promise<void> {
   await localDb.memories.delete(id)
+  notifyDataChanged()
 }
 
 // ── 6. EVENTS CRUD ────────────────────────────────────────────
@@ -234,11 +275,13 @@ export async function createClientEvent(event: Partial<LocalEvent>): Promise<Loc
     ...event,
   }
   await localDb.events.add(newEvent)
+  notifyDataChanged()
   return newEvent
 }
 
 export async function deleteClientEvent(id: string): Promise<void> {
   await localDb.events.delete(id)
+  notifyDataChanged()
 }
 
 // ── 7. CHAT CONVERSATIONS & MESSAGES CRUD ─────────────────────

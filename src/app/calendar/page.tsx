@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AppHeader from '@/components/layout/AppHeader'
 import BottomNav from '@/components/layout/BottomNav'
@@ -23,11 +23,14 @@ import {
   getClientTasks,
   getClientGoals,
   getClientHabits,
+  getClientHabitLogs,
   createClientEvent,
+  createClientTask,
   deleteClientEvent,
   toggleClientTask,
   toggleClientHabit,
 } from '@/lib/data/clientData'
+import type { LocalHabitLog } from '@/lib/db/localDb'
 
 interface Task {
   id: string
@@ -39,6 +42,7 @@ interface Task {
   deadline?: string
   estimatedMinutes?: number
   category?: string
+  completedAt?: string
   createdAt?: string
 }
 
@@ -108,10 +112,11 @@ export default function CalendarPage() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [goals, setGoals] = useState<Goal[]>([])
   const [habits, setHabits] = useState<Habit[]>([])
+  const [habitLogs, setHabitLogs] = useState<LocalHabitLog[]>([])
   const [loading, setLoading] = useState(true)
   const [calendarMode, setCalendarMode] = useState<'week' | 'month'>('week')
-  const [showAddEvent, setShowAddEvent] = useState(false)
-  const [activeMenuEventId, setActiveMenuEventId] = useState<string | null>(null)
+  const [showAddSheet, setShowAddSheet] = useState(false)
+  const [addMode, setAddMode] = useState<'event' | 'task'>('event')
 
   const [newEvent, setNewEvent] = useState({
     title: '',
@@ -121,19 +126,29 @@ export default function CalendarPage() {
     location: '',
   })
 
+  const [newTask, setNewTask] = useState({
+    title: '',
+    priority: 'medium',
+    category: 'study',
+    time: '14:00',
+    estimatedMinutes: 45,
+  })
+
   const loadAllCalendarData = async () => {
     try {
-      const [ev, ta, go, ha] = await Promise.all([
+      const [ev, ta, go, ha, hl] = await Promise.all([
         getClientEvents(),
         getClientTasks(),
         getClientGoals(),
         getClientHabits(),
+        getClientHabitLogs(),
       ])
 
       if (ev) setEvents(ev as any)
       if (ta) setTasks(ta as any)
       if (go) setGoals(go as any)
       if (ha) setHabits(ha as any)
+      if (hl) setHabitLogs(hl)
     } catch (e) {
       console.error('Error loading calendar data:', e)
     } finally {
@@ -178,8 +193,17 @@ export default function CalendarPage() {
       try {
         const startStr = t.scheduledStart ? format(new Date(t.scheduledStart), 'yyyy-MM-dd') : null
         const deadStr = t.deadline ? format(new Date(t.deadline), 'yyyy-MM-dd') : null
+        const compStr = t.completedAt ? format(new Date(t.completedAt), 'yyyy-MM-dd') : null
         const createdStr = t.createdAt ? format(new Date(t.createdAt), 'yyyy-MM-dd') : null
-        return startStr === dayStr || deadStr === dayStr || (!startStr && !deadStr && createdStr === dayStr)
+
+        // Completed on this date
+        if (compStr === dayStr) return true
+        // Scheduled or due on this date
+        if (startStr === dayStr || deadStr === dayStr) return true
+        // Created on this date and not explicitly scheduled for another future date
+        if (!startStr && !deadStr && !compStr && createdStr === dayStr) return true
+
+        return false
       } catch {
         return false
       }
@@ -210,6 +234,7 @@ export default function CalendarPage() {
   const selectedDayTasks = selectedDayItems.dayTasks
   const selectedDayGoals = selectedDayItems.dayGoals
   const selectedDayHabits = selectedDayItems.dayHabits
+  const selectedDayStr = format(selectedDate, 'yyyy-MM-dd')
 
   const prevPeriod = () => {
     if (calendarMode === 'month') {
@@ -234,26 +259,17 @@ export default function CalendarPage() {
   const handleToggleTask = async (task: Task) => {
     const isNowCompleted = task.status !== 'completed'
     await toggleClientTask(task.id, isNowCompleted).catch(() => {})
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('srushti_data_changed'))
-    }
     loadAllCalendarData()
   }
 
-  const handleToggleHabit = async (habitId: string) => {
-    await toggleClientHabit(habitId, true).catch(() => {})
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('srushti_data_changed'))
-    }
+  const handleToggleHabit = async (habitId: string, isCurrentlyDone: boolean) => {
+    await toggleClientHabit(habitId, !isCurrentlyDone, selectedDayStr).catch(() => {})
     loadAllCalendarData()
   }
 
   const handleDeleteEvent = async (id: string, title: string) => {
     if (confirm(`Delete event "${title}"?`)) {
       await deleteClientEvent(id).catch(() => {})
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('srushti_data_changed'))
-      }
       loadAllCalendarData()
     }
   }
@@ -272,24 +288,27 @@ export default function CalendarPage() {
       location: newEvent.location,
     }).catch(() => {})
 
-    await fetch('/api/events', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: newEvent.title,
-        type: newEvent.type,
-        startTime: startIso,
-        endTime: endIso,
-        location: newEvent.location,
-      }),
+    setNewEvent({ title: '', type: 'study', startTime: '09:00', endTime: '10:30', location: '' })
+    setShowAddSheet(false)
+    loadAllCalendarData()
+  }
+
+  const handleCreateTask = async () => {
+    if (!newTask.title.trim()) return
+    const dateStr = format(selectedDate, 'yyyy-MM-dd')
+    const scheduledStart = new Date(`${dateStr}T${newTask.time}:00`).toISOString()
+
+    await createClientTask({
+      title: newTask.title,
+      priority: newTask.priority,
+      category: newTask.category,
+      estimatedMinutes: newTask.estimatedMinutes,
+      scheduledStart,
+      status: 'planned',
     }).catch(() => {})
 
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('srushti_data_changed'))
-    }
-
-    setNewEvent({ title: '', type: 'study', startTime: '09:00', endTime: '10:30', location: '' })
-    setShowAddEvent(false)
+    setNewTask({ title: '', priority: 'medium', category: 'study', time: '14:00', estimatedMinutes: 45 })
+    setShowAddSheet(false)
     loadAllCalendarData()
   }
 
@@ -339,10 +358,10 @@ export default function CalendarPage() {
                 </button>
                 <button
                   className="btn btn-primary btn-sm"
-                  onClick={() => setShowAddEvent(true)}
+                  onClick={() => setShowAddSheet(true)}
                   style={{ fontSize: '11px', padding: '4px 10px' }}
                 >
-                  + Add Event
+                  + Add
                 </button>
               </div>
             </div>
@@ -515,7 +534,7 @@ export default function CalendarPage() {
           <div style={{ marginBottom: 'var(--space-6)' }}>
             <div className="section-header">
               <div className="section-title">
-                {isToday(selectedDate) ? "Today's Schedule & Reminders" : format(selectedDate, "EEE, MMM d") + ' Schedule'}
+                {isToday(selectedDate) ? "Today's Schedule & Tasks" : format(selectedDate, "EEE, MMM d") + ' Schedule'}
               </div>
               <span
                 className="section-action"
@@ -533,14 +552,14 @@ export default function CalendarPage() {
                     No events or tasks scheduled
                   </div>
                   <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', maxWidth: 280, margin: '6px auto 16px' }}>
-                    Tap + Add Event above, or tell Srushti in Chat to schedule your classes, study sessions, and exams.
+                    Tap + Add above to schedule a task or event, or ask AI in Chat to organize your day.
                   </div>
                   <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
                     <button
                       className="btn btn-secondary btn-sm"
-                      onClick={() => setShowAddEvent(true)}
+                      onClick={() => setShowAddSheet(true)}
                     >
-                      + Add Event
+                      + Add Item
                     </button>
                     <button
                       className="btn btn-primary btn-sm"
@@ -667,18 +686,19 @@ export default function CalendarPage() {
                       className="card fade-in-up"
                       style={{
                         borderLeft: `4px solid ${priorityColors[task.priority] || 'var(--brand-primary)'}`,
-                        opacity: isDone ? 0.7 : 1,
+                        opacity: isDone ? 0.75 : 1,
                       }}
                     >
                       <div style={{ padding: 'var(--space-3) var(--space-4)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                        <div
+                        <button
+                          type="button"
                           onClick={() => handleToggleTask(task)}
                           style={{
                             width: 32,
                             height: 32,
                             borderRadius: 'var(--radius-full)',
-                            background: isDone ? 'var(--brand-accent)' : 'var(--bg-subtle)',
-                            border: `2px solid ${isDone ? 'var(--brand-accent)' : 'var(--border-default)'}`,
+                            background: isDone ? 'var(--brand-accent, #10B981)' : 'var(--bg-subtle)',
+                            border: `2px solid ${isDone ? 'var(--brand-accent, #10B981)' : 'var(--border-default)'}`,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -688,10 +708,10 @@ export default function CalendarPage() {
                             cursor: 'pointer',
                             flexShrink: 0,
                           }}
-                          title={isDone ? 'Mark pending' : 'Mark completed'}
+                          title={isDone ? 'Mark as planned' : 'Mark as completed'}
                         >
                           {isDone ? '✓' : ''}
-                        </div>
+                        </button>
 
                         <div style={{ flex: 1 }}>
                           <div style={{
@@ -703,7 +723,12 @@ export default function CalendarPage() {
                           }}>
                             {task.title}
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 2 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 2, flexWrap: 'wrap' }}>
+                            {isDone && task.completedAt && (
+                              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--brand-accent, #10B981)' }}>
+                                ✓ Completed {format(new Date(task.completedAt), 'h:mm a')}
+                              </span>
+                            )}
                             {task.scheduledStart && (
                               <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-secondary)' }}>
                                 ⏰ {format(new Date(task.scheduledStart), 'h:mm a')}
@@ -738,37 +763,80 @@ export default function CalendarPage() {
               </div>
             )}
 
-            {/* 4. Habits daily row */}
+            {/* 4. Habits daily row with 1-tap toggle for this day */}
             {selectedDayHabits.length > 0 && (
               <div style={{ marginTop: 'var(--space-5)' }}>
                 <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>
-                  Daily Habit Commitments
+                  Daily Habits ({selectedDayHabits.length})
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {selectedDayHabits.map(habit => (
-                    <div
-                      key={habit.id}
-                      className="card"
-                      style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span style={{ fontSize: 16 }}>🔁</span>
-                        <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-primary)' }}>
-                          {habit.title}
-                        </span>
-                        {habit.scheduledTime && (
-                          <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
-                            ⏰ {habit.scheduledTime}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {selectedDayHabits.map(habit => {
+                    const isHabitDone = habitLogs.some(
+                      l => l.habitId === habit.id && l.date === selectedDayStr && l.status === 'completed'
+                    )
+
+                    return (
+                      <div
+                        key={habit.id}
+                        className="card"
+                        style={{
+                          padding: '10px 14px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          borderLeft: `3px solid ${isHabitDone ? 'var(--brand-accent, #10B981)' : 'var(--border-default)'}`,
+                          background: isHabitDone ? 'linear-gradient(90deg, rgba(16,185,129,0.06), var(--bg-surface))' : 'var(--bg-surface)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleHabit(habit.id, isHabitDone)}
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: 'var(--radius-full)',
+                              background: isHabitDone ? 'var(--brand-accent, #10B981)' : 'transparent',
+                              border: `2px solid ${isHabitDone ? 'var(--brand-accent, #10B981)' : 'var(--border-strong)'}`,
+                              color: 'white',
+                              fontSize: 13,
+                              fontWeight: 800,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              flexShrink: 0,
+                            }}
+                            title={isHabitDone ? 'Mark undone for this date' : 'Mark done for this date'}
+                          >
+                            {isHabitDone ? '✓' : ''}
+                          </button>
+
+                          <div>
+                            <div style={{
+                              fontSize: 'var(--text-sm)',
+                              fontWeight: 700,
+                              color: 'var(--text-primary)',
+                              textDecoration: isHabitDone ? 'line-through' : 'none',
+                            }}>
+                              {habit.title}
+                            </div>
+                            {habit.scheduledTime && (
+                              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                                ⏰ {habit.scheduledTime}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--brand-warm)' }}>
+                            🔥 {habit.currentStreak}d
                           </span>
-                        )}
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--brand-warm)' }}>
-                          🔥 {habit.currentStreak}d
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             )}
@@ -777,88 +845,191 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {/* ── ADD EVENT SHEET ─────────────────────────── */}
-      {showAddEvent && (
+      {/* ── ADD EVENT / TASK SHEET ─────────────────────────── */}
+      {showAddSheet && (
         <>
-          <div className="sheet-overlay" onClick={() => setShowAddEvent(false)} />
+          <div className="sheet-overlay" onClick={() => setShowAddSheet(false)} />
           <div className="bottom-sheet">
             <div className="sheet-handle" />
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 700, marginBottom: 'var(--space-4)' }}>
-              Add Schedule Event
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-              <div className="input-group">
-                <label className="input-label">Event Title</label>
-                <input
-                  className="input"
-                  placeholder="e.g. CAO Lecture, Lab Session, Study..."
-                  value={newEvent.title}
-                  onChange={e => setNewEvent(p => ({ ...p, title: e.target.value }))}
-                  autoFocus
-                />
-              </div>
 
-              <div className="input-group">
-                <label className="input-label">Category</label>
-                <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-                  {['class', 'exam', 'meeting', 'study', 'personal'].map(t => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setNewEvent(p => ({ ...p, type: t }))}
-                      style={{
-                        padding: '6px 12px',
-                        borderRadius: 'var(--radius-full)',
-                        fontSize: 'var(--text-xs)',
-                        fontWeight: 700,
-                        textTransform: 'capitalize',
-                        background: newEvent.type === t ? 'var(--brand-primary)' : 'var(--bg-muted)',
-                        color: newEvent.type === t ? 'white' : 'var(--text-secondary)',
-                        border: 'none',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {typeIcons[t]} {t}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-                <div className="input-group" style={{ flex: 1 }}>
-                  <label className="input-label">Start Time</label>
-                  <input
-                    type="time"
-                    className="input"
-                    value={newEvent.startTime}
-                    onChange={e => setNewEvent(p => ({ ...p, startTime: e.target.value }))}
-                  />
-                </div>
-                <div className="input-group" style={{ flex: 1 }}>
-                  <label className="input-label">End Time</label>
-                  <input
-                    type="time"
-                    className="input"
-                    value={newEvent.endTime}
-                    onChange={e => setNewEvent(p => ({ ...p, endTime: e.target.value }))}
-                  />
-                </div>
-              </div>
-
-              <div className="input-group">
-                <label className="input-label">Location (optional)</label>
-                <input
-                  className="input"
-                  placeholder="Room 304, Library, Google Meet..."
-                  value={newEvent.location}
-                  onChange={e => setNewEvent(p => ({ ...p, location: e.target.value }))}
-                />
-              </div>
-
-              <button className="btn btn-primary btn-full" onClick={handleCreateEvent}>
-                Save to Calendar
+            {/* Type selector tabs: Event vs Task */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 'var(--space-4)', background: 'var(--bg-muted)', padding: 4, borderRadius: 'var(--radius-lg)' }}>
+              <button
+                type="button"
+                onClick={() => setAddMode('event')}
+                style={{
+                  flex: 1,
+                  padding: '8px 0',
+                  borderRadius: 'var(--radius-md)',
+                  border: 'none',
+                  background: addMode === 'event' ? 'var(--brand-primary)' : 'transparent',
+                  color: addMode === 'event' ? 'white' : 'var(--text-secondary)',
+                  fontWeight: 700,
+                  fontSize: 'var(--text-sm)',
+                  cursor: 'pointer',
+                }}
+              >
+                📅 Add Event
+              </button>
+              <button
+                type="button"
+                onClick={() => setAddMode('task')}
+                style={{
+                  flex: 1,
+                  padding: '8px 0',
+                  borderRadius: 'var(--radius-md)',
+                  border: 'none',
+                  background: addMode === 'task' ? 'var(--brand-primary)' : 'transparent',
+                  color: addMode === 'task' ? 'white' : 'var(--text-secondary)',
+                  fontWeight: 700,
+                  fontSize: 'var(--text-sm)',
+                  cursor: 'pointer',
+                }}
+              >
+                📋 Add Task
               </button>
             </div>
+
+            {addMode === 'event' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+                <div className="input-group">
+                  <label className="input-label">Event Title</label>
+                  <input
+                    className="input"
+                    placeholder="e.g. CAO Lecture, Lab Session, Study Block..."
+                    value={newEvent.title}
+                    onChange={e => setNewEvent(p => ({ ...p, title: e.target.value }))}
+                    autoFocus
+                  />
+                </div>
+
+                <div className="input-group">
+                  <label className="input-label">Category</label>
+                  <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                    {['class', 'exam', 'meeting', 'study', 'personal'].map(t => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setNewEvent(p => ({ ...p, type: t }))}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: 'var(--radius-full)',
+                          fontSize: 'var(--text-xs)',
+                          fontWeight: 700,
+                          textTransform: 'capitalize',
+                          background: newEvent.type === t ? 'var(--brand-primary)' : 'var(--bg-muted)',
+                          color: newEvent.type === t ? 'white' : 'var(--text-secondary)',
+                          border: 'none',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {typeIcons[t]} {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+                  <div className="input-group" style={{ flex: 1 }}>
+                    <label className="input-label">Start Time</label>
+                    <input
+                      type="time"
+                      className="input"
+                      value={newEvent.startTime}
+                      onChange={e => setNewEvent(p => ({ ...p, startTime: e.target.value }))}
+                    />
+                  </div>
+                  <div className="input-group" style={{ flex: 1 }}>
+                    <label className="input-label">End Time</label>
+                    <input
+                      type="time"
+                      className="input"
+                      value={newEvent.endTime}
+                      onChange={e => setNewEvent(p => ({ ...p, endTime: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="input-group">
+                  <label className="input-label">Location (optional)</label>
+                  <input
+                    className="input"
+                    placeholder="Room 304, Library, Google Meet..."
+                    value={newEvent.location}
+                    onChange={e => setNewEvent(p => ({ ...p, location: e.target.value }))}
+                  />
+                </div>
+
+                <button className="btn btn-primary btn-full" onClick={handleCreateEvent}>
+                  Save Event to Calendar
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+                <div className="input-group">
+                  <label className="input-label">Task Title</label>
+                  <input
+                    className="input"
+                    placeholder="e.g. Complete math exercises, review flashcards..."
+                    value={newTask.title}
+                    onChange={e => setNewTask(p => ({ ...p, title: e.target.value }))}
+                    autoFocus
+                  />
+                </div>
+
+                <div className="input-group">
+                  <label className="input-label">Priority</label>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {['low', 'medium', 'high', 'critical'].map(p => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setNewTask(prev => ({ ...prev, priority: p }))}
+                        style={{
+                          flex: 1,
+                          padding: '6px 0',
+                          borderRadius: 'var(--radius-md)',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          textTransform: 'capitalize',
+                          border: 'none',
+                          background: newTask.priority === p ? priorityColors[p] : 'var(--bg-muted)',
+                          color: newTask.priority === p ? 'white' : 'var(--text-secondary)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+                  <div className="input-group" style={{ flex: 1 }}>
+                    <label className="input-label">Scheduled Time</label>
+                    <input
+                      type="time"
+                      className="input"
+                      value={newTask.time}
+                      onChange={e => setNewTask(p => ({ ...p, time: e.target.value }))}
+                    />
+                  </div>
+                  <div className="input-group" style={{ flex: 1 }}>
+                    <label className="input-label">Estimated Minutes</label>
+                    <input
+                      type="number"
+                      className="input"
+                      value={newTask.estimatedMinutes}
+                      onChange={e => setNewTask(p => ({ ...p, estimatedMinutes: Number(e.target.value) || 30 }))}
+                    />
+                  </div>
+                </div>
+
+                <button className="btn btn-primary btn-full" onClick={handleCreateTask}>
+                  Save Task to Calendar
+                </button>
+              </div>
+            )}
           </div>
         </>
       )}
