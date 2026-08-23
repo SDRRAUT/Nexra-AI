@@ -13,16 +13,17 @@ export default function OnboardingWizard({ onCompleted }: OnboardingWizardProps)
   const [generationStatus, setGenerationStatus] = useState('Initializing your assistant...')
 
   const [answers, setAnswers] = useState<OnboardingAnswers>({
-    name: 'Sanket',
-    role: 'Student & Developer',
-    mainGoals: 'Master Machine Learning Architecture, Build and Deploy Srushti AI App',
+    name: '',
+    assistantName: '',
+    role: '',
+    mainGoals: '',
     dailyRoutine: {
       wakeTime: '07:00',
       sleepTime: '23:30',
       focusHours: 4,
     },
-    habitsToBuild: 'Daily 45m Focus Sprint, Hydration 8 Glasses, 30m Technical Reading',
-    upcomingDeadlines: 'CAO Exam Preparation, Semester Project Submission',
+    habitsToBuild: '',
+    upcomingDeadlines: '',
     aiTone: 'autonomous',
     apiKey: '',
   })

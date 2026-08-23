@@ -387,10 +387,13 @@ export async function generateInitialPlanFromOnboarding(data: OnboardingAnswers)
   goalsCount: number
   habitsCount: number
 }> {
+  const userName = data.name.trim() || 'You'
+  const assistantName = data.assistantName?.trim() || 'Srushti'
+
   // 1. Save User Profile
   await localDb.user.put({
     id: 'default-user',
-    name: data.name.trim() || 'Sanket',
+    name: userName,
     timezone: 'Asia/Kolkata',
     aiAutonomy: data.aiTone || 'autonomous',
     notifications: true,
@@ -399,11 +402,9 @@ export async function generateInitialPlanFromOnboarding(data: OnboardingAnswers)
   })
 
   if (typeof localStorage !== 'undefined') {
-    localStorage.setItem('srushti_user_name', data.name.trim() || 'Sanket')
-    if (data.assistantName?.trim()) {
-      localStorage.setItem('srushti_assistant_name', data.assistantName.trim())
-      await localDb.preferences.put({ key: 'assistant_name', value: data.assistantName.trim() }).catch(() => {})
-    }
+    localStorage.setItem('srushti_user_name', userName)
+    localStorage.setItem('srushti_assistant_name', assistantName)
+    await localDb.preferences.put({ key: 'assistant_name', value: assistantName }).catch(() => {})
     localStorage.setItem('srushti_onboarding_done', 'true')
     if (data.apiKey) {
       localStorage.setItem('srushti_gemini_api_key', data.apiKey.trim())
@@ -418,16 +419,30 @@ export async function generateInitialPlanFromOnboarding(data: OnboardingAnswers)
     .filter(Boolean)
 
   let goalsCreated = 0
-  for (let i = 0; i < Math.min(goalTitles.length, 3); i++) {
-    const title = goalTitles[i]
+  if (goalTitles.length > 0) {
+    for (let i = 0; i < Math.min(goalTitles.length, 3); i++) {
+      const title = goalTitles[i]
+      await executeClientTool('create_goal', {
+        title,
+        category: 'learning',
+        priority: 'high',
+        milestones: [
+          `Setup roadmap for ${title}`,
+          `Complete foundation milestones`,
+          `Review and consolidate progress`,
+        ],
+      })
+      goalsCreated++
+    }
+  } else {
     await executeClientTool('create_goal', {
-      title,
-      category: 'learning',
+      title: 'Daily Productivity & Growth Roadmap',
+      category: 'personal',
       priority: 'high',
       milestones: [
-        `Setup roadmap for ${title}`,
-        `Complete foundation milestones`,
-        `Review and consolidate progress`,
+        'Organize daily schedule',
+        'Build consistent habit streaks',
+        'Achieve weekly milestones',
       ],
     })
     goalsCreated++
@@ -440,14 +455,28 @@ export async function generateInitialPlanFromOnboarding(data: OnboardingAnswers)
     .filter(Boolean)
 
   let habitsCreated = 0
-  for (let i = 0; i < Math.min(habitTitles.length, 3); i++) {
-    const title = habitTitles[i]
+  if (habitTitles.length > 0) {
+    for (let i = 0; i < Math.min(habitTitles.length, 3); i++) {
+      const title = habitTitles[i]
+      await executeClientTool('create_habit', {
+        title,
+        scheduledTime: i === 0 ? '08:30' : i === 1 ? '17:00' : '21:00',
+        category: 'productivity',
+      })
+      habitsCreated++
+    }
+  } else {
     await executeClientTool('create_habit', {
-      title,
-      scheduledTime: i === 0 ? '08:30' : i === 1 ? '17:00' : '21:00',
+      title: 'Daily 30m Deep Focus Sprint',
+      scheduledTime: '09:00',
       category: 'productivity',
     })
-    habitsCreated++
+    await executeClientTool('create_habit', {
+      title: 'Evening Review & Wind Down',
+      scheduledTime: '21:30',
+      category: 'wellness',
+    })
+    habitsCreated += 2
   }
 
   // 4. Parse deadlines and create initial focus tasks
@@ -467,7 +496,7 @@ export async function generateInitialPlanFromOnboarding(data: OnboardingAnswers)
 
   // Add initial welcome focus task
   await executeClientTool('create_task', {
-    title: `Review daily focus priorities with Srushti AI`,
+    title: `Review daily focus priorities with ${assistantName}`,
     priority: 'medium',
     category: 'personal',
     estimatedMinutes: 20,
