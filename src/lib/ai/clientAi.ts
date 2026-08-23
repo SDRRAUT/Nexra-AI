@@ -1,4 +1,5 @@
 import { localDb } from '@/lib/db/localDb'
+import { scheduleCustomReminder, scheduleTaskReminder } from '@/lib/notifications/native'
 
 export interface ClientAICallback {
   onChunk: (chunk: string) => void
@@ -47,7 +48,45 @@ export async function executeClientTool(toolName: string, params: any): Promise<
           createdAt: new Date().toISOString(),
         }
         await localDb.tasks.add(newTask)
+        if (newTask.scheduledStart || newTask.deadline) {
+          scheduleTaskReminder(newTask).catch(() => {})
+        }
         result = { success: true, taskId, task: newTask }
+        break
+      }
+
+      case 'create_reminder':
+      case 'schedule_notification': {
+        const title = params.title || 'Reminder'
+        let scheduleDate = new Date(params.time || params.scheduleAt || Date.now() + 60000)
+        if (isNaN(scheduleDate.getTime()) || scheduleDate <= new Date()) {
+          scheduleDate = new Date(Date.now() + 60000) // 1 min fallback if past/invalid
+        }
+
+        const numericId = await scheduleCustomReminder({
+          title,
+          body: params.body || `Reminder from your Assistant: ${title}`,
+          scheduleAt: scheduleDate,
+          actionType: 'task',
+        })
+
+        // Also add task to schedule
+        const taskId = 'task-' + Date.now()
+        await localDb.tasks.add({
+          id: taskId,
+          title,
+          description: params.body || '',
+          category: 'reminder',
+          priority: 'high',
+          status: 'planned',
+          scheduledStart: scheduleDate.toISOString(),
+          deadline: scheduleDate.toISOString(),
+          estimatedMinutes: 15,
+          postponeCount: 0,
+          createdAt: new Date().toISOString(),
+        }).catch(() => {})
+
+        result = { success: true, reminderId: numericId, scheduledAt: scheduleDate.toISOString() }
         break
       }
 
@@ -242,6 +281,10 @@ Or:
 Or:
 \`\`\`action
 {"tool": "create_habit", "params": {"title": "...", "scheduledTime": "08:00"}}
+\`\`\`
+Or:
+\`\`\`action
+{"tool": "create_reminder", "params": {"title": "...", "time": "YYYY-MM-DDTHH:mm:ss", "body": "..."}}
 \`\`\`
 Or:
 \`\`\`action

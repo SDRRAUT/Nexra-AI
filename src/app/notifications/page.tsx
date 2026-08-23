@@ -5,8 +5,14 @@ import { useRouter } from 'next/navigation'
 import AppHeader from '@/components/layout/AppHeader'
 import BottomNav from '@/components/layout/BottomNav'
 import { format, formatDistanceToNow } from 'date-fns'
-import { sendNativeNotification } from '@/lib/notifications/native'
-import { localDb, type LocalNotification } from '@/lib/db/localDb'
+import {
+  sendNativeNotification,
+  requestNotificationPermission,
+  getPendingScheduledNotifications,
+  syncAllActiveReminders,
+} from '@/lib/notifications/native'
+import { localDb, type LocalNotification, type LocalTask } from '@/lib/db/localDb'
+import { toggleClientTask } from '@/lib/data/clientData'
 
 interface Notification {
   id: string
@@ -21,32 +27,40 @@ interface Notification {
 }
 
 const typeStyles: Record<string, { icon: string; bg: string; color: string; label: string }> = {
-  critical: { icon: '🚨', bg: 'var(--priority-critical-bg)', color: 'var(--priority-critical)', label: 'Critical' },
-  warning: { icon: '⚠️', bg: 'var(--priority-high-bg)', color: 'var(--priority-high)', label: 'Warning' },
-  accountability: { icon: '🎯', bg: 'var(--priority-medium-bg)', color: 'var(--priority-medium)', label: 'Accountability' },
-  reminder: { icon: '🔔', bg: 'var(--bg-subtle)', color: 'var(--brand-primary)', label: 'Reminder' },
+  critical: { icon: '🚨', bg: 'var(--priority-critical-bg, rgba(239,68,68,0.1))', color: 'var(--priority-critical, #EF4444)', label: 'Critical' },
+  warning: { icon: '⚠️', bg: 'var(--priority-high-bg, rgba(249,115,22,0.1))', color: 'var(--priority-high, #F97316)', label: 'Warning' },
+  accountability: { icon: '🎯', bg: 'var(--priority-medium-bg, rgba(59,130,246,0.1))', color: 'var(--priority-medium, #3B82F6)', label: 'Accountability' },
+  reminder: { icon: '🔔', bg: 'rgba(91,107,240,0.12)', color: 'var(--brand-primary, #5B6BF0)', label: 'Reminder' },
   info: { icon: 'ℹ️', bg: 'var(--bg-muted)', color: 'var(--text-secondary)', label: 'Info' },
-  approval: { icon: '✅', bg: '#F0FDF4', color: 'var(--brand-accent)', label: 'Approval' },
+  approval: { icon: '✅', bg: 'rgba(16,185,129,0.12)', color: 'var(--brand-accent, #10B981)', label: 'Approval' },
 }
 
 export default function NotificationsPage() {
   const router = useRouter()
   const [notifications, setNotifications] = useState<Notification[]>([])
-  const [filter, setFilter] = useState<'all' | 'unread' | 'alerts'>('all')
+  const [scheduledTasks, setScheduledTasks] = useState<LocalTask[]>([])
+  const [pendingCapacitorNotifs, setPendingCapacitorNotifs] = useState<any[]>([])
+  const [filter, setFilter] = useState<'all' | 'unread' | 'scheduled'>('all')
   const [loading, setLoading] = useState(true)
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null)
 
   const fetchNotifications = async () => {
     try {
-      // 1. Try local IndexedDB
-      const localNotifs = await localDb.notifications.toArray().catch(() => [])
-      if (localNotifs && localNotifs.length > 0) {
-        setNotifications(localNotifs as any)
-      }
+      // 1. Load local IndexedDB notifications
+      const localNotifs = await localDb.notifications.orderBy('createdAt').reverse().toArray().catch(() => [])
+      setNotifications(localNotifs as any)
 
-      // 2. Also try API if server is running
-      const res = await fetch('/api/notifications').then(r => r.json()).catch(() => null)
-      if (Array.isArray(res)) setNotifications(res)
-    } catch {
+      // 2. Load scheduled active tasks
+      const now = new Date().toISOString()
+      const allTasks = await localDb.tasks.toArray().catch(() => [])
+      const upcoming = allTasks.filter(t => t.status !== 'completed' && ((t.scheduledStart && t.scheduledStart > now) || (t.deadline && t.deadline > now)))
+      setScheduledTasks(upcoming)
+
+      // 3. Load pending native notifications
+      const pending = await getPendingScheduledNotifications()
+      setPendingCapacitorNotifs(pending)
+    } catch (e) {
+      console.error('Error loading notifications:', e)
     } finally {
       setLoading(false)
     }
@@ -54,6 +68,12 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     fetchNotifications()
+
+    // Check permission
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setHasPermission(Notification.permission === 'granted')
+    }
+
     const handleDataChanged = () => {
       fetchNotifications()
     }
@@ -61,62 +81,54 @@ export default function NotificationsPage() {
     return () => window.removeEventListener('srushti_data_changed', handleDataChanged)
   }, [])
 
+  const handleRequestPermission = async () => {
+    const granted = await requestNotificationPermission()
+    setHasPermission(granted)
+    if (granted) {
+      await syncAllActiveReminders()
+      alert('🔔 Notifications enabled! Your alarms and morning briefings will ring on time.')
+    }
+  }
+
   const markRead = async (id: string, e?: React.MouseEvent) => {
     e?.stopPropagation()
     await localDb.notifications.update(id, { status: 'read' }).catch(() => {})
-    await fetch('/api/notifications', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, status: 'read' }),
-    }).catch(() => {})
     fetchNotifications()
   }
 
   const markAllRead = async () => {
     const all = await localDb.notifications.toArray().catch(() => [])
     await Promise.all(all.map(n => localDb.notifications.update(n.id, { status: 'read' }))).catch(() => {})
-    await fetch('/api/notifications', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: 'all', status: 'read' }),
-    }).catch(() => {})
     fetchNotifications()
   }
 
   const deleteNotification = async (id: string, e?: React.MouseEvent) => {
     e?.stopPropagation()
     await localDb.notifications.delete(id).catch(() => {})
-    await fetch(`/api/notifications?id=${id}`, {
-      method: 'DELETE',
-    }).catch(() => {})
     fetchNotifications()
   }
 
   const clearAll = async () => {
-    if (confirm('Clear all notifications?')) {
-      await fetch('/api/notifications?id=all', {
-        method: 'DELETE',
-      })
+    if (confirm('Clear all notification history?')) {
+      await localDb.notifications.clear().catch(() => {})
       fetchNotifications()
     }
   }
 
   const sendTestAlert = async () => {
-    const alertTitle = '🌱 Srushti Accountability Check'
-    const alertBody = 'You planned "Review Lecture Notes" for today. Are you ready to begin your focus block?'
+    const alertTitle = '🔔 Test Notification'
+    const alertBody = 'Your Personal Assistant notification engine is active with real-time sound and lockscreen alerts!'
 
-    await fetch('/api/notifications', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: alertTitle,
-        body: alertBody,
-        type: 'accountability',
-        actionType: 'start_now,reschedule',
-      }),
-    })
+    await localDb.notifications.add({
+      id: `notif-test-${Date.now()}`,
+      title: alertTitle,
+      body: alertBody,
+      type: 'reminder',
+      status: 'unread',
+      createdAt: new Date().toISOString(),
+    }).catch(() => {})
 
-    // Also trigger native OS lockscreen notification
+    // Trigger native OS lockscreen notification
     await sendNativeNotification({
       title: alertTitle,
       body: alertBody,
@@ -125,17 +137,31 @@ export default function NotificationsPage() {
     fetchNotifications()
   }
 
+  const handleSyncReminders = async () => {
+    await syncAllActiveReminders()
+    fetchNotifications()
+    alert('✅ Synced all active task reminders, daily habit nudges, and 8:00 AM morning briefings with your phone.')
+  }
+
+  const handleCompleteTask = async (taskId: string, notifId?: string) => {
+    await toggleClientTask(taskId, true).catch(() => {})
+    if (notifId) {
+      await localDb.notifications.update(notifId, { status: 'read' }).catch(() => {})
+    }
+    fetchNotifications()
+  }
+
   const unreadList = notifications.filter(n => n.status === 'unread')
 
   const filteredNotifications = notifications.filter(n => {
     if (filter === 'unread') return n.status === 'unread'
-    if (filter === 'alerts') return ['critical', 'warning', 'accountability'].includes(n.type)
+    if (filter === 'scheduled') return false
     return true
   })
 
   return (
     <div className="app-shell">
-      <AppHeader />
+      <AppHeader title="Notifications" subtitle="Alerts & Scheduled Reminders" showBrand={false} showBack={false} />
 
       <div className="page-content">
         <div className="page-section" style={{ marginTop: 'var(--space-4)' }}>
@@ -153,225 +179,298 @@ export default function NotificationsPage() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--brand-primary)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
-                  INBOX & ALERTS
+                  NOTIFICATION CENTER
                 </div>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 800, color: 'var(--text-primary)' }}>
-                  Notifications
+                  Reminders & Alarms
                 </div>
                 <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginTop: 2 }}>
-                  {unreadList.length} unread updates waiting
+                  {unreadList.length} unread alerts · {scheduledTasks.length} upcoming scheduled
                 </div>
               </div>
 
               <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                {unreadList.length > 0 && (
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={markAllRead}
-                    style={{ fontSize: '11px', padding: '4px 10px' }}
-                  >
-                    Mark All Read
-                  </button>
-                )}
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={sendTestAlert}
-                  style={{ fontSize: '11px', padding: '4px 10px' }}
-                  title="Simulate AI alert"
-                >
-                  + Test Alert
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* ── FILTER PILLS ─────────────────────────── */}
-          <div style={{ display: 'flex', gap: 'var(--space-2)', background: 'var(--bg-muted)', borderRadius: 'var(--radius-full)', padding: '3px', marginBottom: 'var(--space-4)' }}>
-            {(['all', 'unread', 'alerts'] as const).map(f => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                style={{
-                  flex: 1,
-                  padding: '6px',
-                  borderRadius: 'var(--radius-full)',
-                  fontSize: 'var(--text-xs)',
-                  fontWeight: 700,
-                  transition: 'all var(--transition-fast)',
-                  background: filter === f ? 'var(--bg-surface)' : 'transparent',
-                  color: filter === f ? 'var(--brand-primary)' : 'var(--text-tertiary)',
-                  boxShadow: filter === f ? 'var(--shadow-sm)' : 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  textTransform: 'capitalize',
-                }}
-              >
-                {f === 'unread' ? `Unread (${unreadList.length})` : f}
-              </button>
-            ))}
-          </div>
-
-          {/* ── NOTIFICATIONS FEED ─────────────────────────── */}
-          {loading && (
-            <>
-              <div className="skeleton" style={{ height: 90, borderRadius: 16, marginBottom: 12 }} />
-              <div className="skeleton" style={{ height: 90, borderRadius: 16 }} />
-            </>
-          )}
-
-          {!loading && filteredNotifications.length === 0 && (
-            <div className="card fade-in-up">
-              <div className="empty-state" style={{ padding: 'var(--space-8) var(--space-4)' }}>
-                <div className="empty-icon">🔔</div>
-                <div className="empty-title">You're all caught up!</div>
-                <div className="empty-sub">
-                  No notifications match this filter. Srushti will proactively alert you about schedule conflicts or upcoming deadlines.
-                </div>
                 <button
                   className="btn btn-secondary btn-sm"
                   onClick={sendTestAlert}
-                  style={{ marginTop: 'var(--space-4)' }}
+                  style={{ fontSize: '11px', padding: '4px 10px' }}
+                  title="Test notification on this phone"
                 >
-                  Send Sample AI Check-in
+                  🔔 Test
+                </button>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={handleSyncReminders}
+                  style={{ fontSize: '11px', padding: '4px 10px' }}
+                  title="Sync all active task alarms"
+                >
+                  🔄 Sync
                 </button>
               </div>
             </div>
-          )}
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginBottom: 'var(--space-6)' }}>
-            {filteredNotifications.map(notif => {
-              const style = typeStyles[notif.type] || typeStyles.info
-              const isUnread = notif.status === 'unread'
-
-              return (
-                <div
-                  key={notif.id}
-                  className="card fade-in-up"
-                  onClick={() => isUnread && markRead(notif.id)}
-                  style={{
-                    border: isUnread ? `1.5px solid ${style.color}40` : '1px solid var(--border-subtle)',
-                    background: isUnread ? 'var(--bg-surface)' : 'var(--bg-subtle)',
-                    position: 'relative',
-                    transition: 'all var(--transition-fast)',
-                  }}
-                >
-                  <div style={{ padding: 'var(--space-4) var(--space-4)' }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)' }}>
-                      <div
-                        style={{
-                          width: 40,
-                          height: 40,
-                          borderRadius: 'var(--radius-md)',
-                          background: style.bg,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: 20,
-                          flexShrink: 0,
-                          border: `1px solid ${style.color}30`,
-                        }}
-                      >
-                        {style.icon}
-                      </div>
-
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
-                          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 'var(--text-base)', color: 'var(--text-primary)' }}>
-                            {notif.title}
-                          </div>
-                          {isUnread && (
-                            <span
-                              style={{
-                                width: 8,
-                                height: 8,
-                                borderRadius: '50%',
-                                background: 'var(--brand-primary)',
-                                flexShrink: 0,
-                              }}
-                            />
-                          )}
-                        </div>
-
-                        {notif.body && (
-                          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', marginTop: 4, lineHeight: 1.4 }}>
-                            {notif.body}
-                          </div>
-                        )}
-
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                            <span
-                              style={{
-                                fontSize: '10px',
-                                fontWeight: 700,
-                                color: style.color,
-                                background: style.bg,
-                                padding: '1px 6px',
-                                borderRadius: 'var(--radius-full)',
-                              }}
-                            >
-                              {style.label}
-                            </span>
-                            <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
-                              {formatDistanceToNow(new Date(notif.createdAt), { addSuffix: true })}
-                            </span>
-                          </div>
-
-                          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                            {isUnread && (
-                              <button
-                                onClick={(e) => markRead(notif.id, e)}
-                                style={{ fontSize: '11px', fontWeight: 600, color: 'var(--brand-primary)' }}
-                              >
-                                Read
-                              </button>
-                            )}
-                            <button
-                              onClick={(e) => deleteNotification(notif.id, e)}
-                              style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}
-                              title="Delete"
-                            >
-                              Dismiss
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Action buttons */}
-                        {notif.actionType && (
-                          <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)', paddingTop: 'var(--space-2)', borderTop: '1px solid var(--border-subtle)' }}>
-                            {notif.actionType.split(',').map(action => (
-                              <button
-                                key={action}
-                                className="btn btn-secondary btn-sm"
-                                style={{ fontSize: '11px', padding: '4px 10px', textTransform: 'capitalize' }}
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  sessionStorage.setItem('srushti_prefill', `Regarding notification: ${notif.title} — let's handle this action: ${action}`)
-                                  router.push('/chat')
-                                }}
-                              >
-                                {action.replace('_', ' ')} →
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
           </div>
 
-          {/* Clear all footer */}
-          {notifications.length > 0 && (
-            <div style={{ textAlign: 'center', marginBottom: 'var(--space-8)' }}>
+          {/* ── PERMISSION PROMPT BANNER (IF NOT GRANTED) ─── */}
+          {hasPermission === false && (
+            <div
+              className="card fade-in-up"
+              style={{
+                padding: 'var(--space-3) var(--space-4)',
+                background: 'linear-gradient(90deg, rgba(239,68,68,0.12), var(--bg-surface))',
+                border: '1px solid var(--status-error, #EF4444)',
+                marginBottom: 'var(--space-4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 20 }}>⚠️</span>
+                <div>
+                  <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    Enable Push Notifications
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                    Allow alerts so your phone rings on time for scheduled reminders & morning briefings.
+                  </div>
+                </div>
+              </div>
               <button
-                onClick={clearAll}
-                style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', fontWeight: 600, textDecoration: 'underline' }}
+                className="btn btn-primary btn-sm"
+                onClick={handleRequestPermission}
+                style={{ fontSize: '11px', whiteSpace: 'nowrap' }}
               >
-                Clear all notifications
+                Enable
               </button>
+            </div>
+          )}
+
+          {/* ── FILTER CHIPS ─────────────────────────── */}
+          <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', overflowX: 'auto' }}>
+            <button
+              className={`chip ${filter === 'all' ? 'active' : ''}`}
+              onClick={() => setFilter('all')}
+              style={{
+                padding: '6px 14px',
+                borderRadius: 'var(--radius-full)',
+                fontSize: 'var(--text-xs)',
+                fontWeight: 700,
+                border: 'none',
+                background: filter === 'all' ? 'var(--brand-primary)' : 'var(--bg-muted)',
+                color: filter === 'all' ? 'white' : 'var(--text-secondary)',
+                cursor: 'pointer',
+              }}
+            >
+              All Alerts ({notifications.length})
+            </button>
+            <button
+              className={`chip ${filter === 'unread' ? 'active' : ''}`}
+              onClick={() => setFilter('unread')}
+              style={{
+                padding: '6px 14px',
+                borderRadius: 'var(--radius-full)',
+                fontSize: 'var(--text-xs)',
+                fontWeight: 700,
+                border: 'none',
+                background: filter === 'unread' ? 'var(--brand-primary)' : 'var(--bg-muted)',
+                color: filter === 'unread' ? 'white' : 'var(--text-secondary)',
+                cursor: 'pointer',
+              }}
+            >
+              Unread ({unreadList.length})
+            </button>
+            <button
+              className={`chip ${filter === 'scheduled' ? 'active' : ''}`}
+              onClick={() => setFilter('scheduled')}
+              style={{
+                padding: '6px 14px',
+                borderRadius: 'var(--radius-full)',
+                fontSize: 'var(--text-xs)',
+                fontWeight: 700,
+                border: 'none',
+                background: filter === 'scheduled' ? 'var(--brand-primary)' : 'var(--bg-muted)',
+                color: filter === 'scheduled' ? 'white' : 'var(--text-secondary)',
+                cursor: 'pointer',
+              }}
+            >
+              ⏰ Scheduled Queue ({scheduledTasks.length})
+            </button>
+          </div>
+
+          {/* ── SCHEDULED QUEUE VIEW ─────────────────────────── */}
+          {filter === 'scheduled' ? (
+            <div>
+              {scheduledTasks.length === 0 ? (
+                <div className="card fade-in-up" style={{ padding: 'var(--space-8) var(--space-4)', textAlign: 'center' }}>
+                  <div style={{ fontSize: 36, marginBottom: 'var(--space-2)' }}>⏰</div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    No Upcoming Scheduled Reminders
+                  </div>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', maxWidth: 280, margin: '6px auto 16px' }}>
+                    Tell your Assistant in Chat: &quot;Remind me tomorrow at 9 AM to review notes&quot; to schedule alarms.
+                  </div>
+                  <button className="btn btn-primary btn-sm" onClick={() => router.push('/chat')}>
+                    Ask AI in Chat
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                  {scheduledTasks.map(task => {
+                    const timeStr = task.scheduledStart || task.deadline
+                    const taskDate = timeStr ? new Date(timeStr) : null
+
+                    return (
+                      <div
+                        key={task.id}
+                        className="card fade-in-up"
+                        style={{
+                          padding: 'var(--space-3) var(--space-4)',
+                          borderLeft: '4px solid var(--brand-primary)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <div>
+                            <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text-primary)' }}>
+                              ⏰ {task.title}
+                            </div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: 2 }}>
+                              {taskDate ? `Scheduled for ${format(taskDate, 'EEE, MMM d · h:mm a')} (${formatDistanceToNow(taskDate, { addSuffix: true })})` : 'Scheduled'}
+                            </div>
+                          </div>
+
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => handleCompleteTask(task.id)}
+                            style={{ fontSize: '11px' }}
+                          >
+                            ✓ Mark Done
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          ) : (
+            /* ── ALL / UNREAD NOTIFICATIONS LIST ─────────────────────────── */
+            <div>
+              {filteredNotifications.length === 0 ? (
+                <div className="card fade-in-up" style={{ padding: 'var(--space-8) var(--space-4)', textAlign: 'center' }}>
+                  <div style={{ fontSize: 36, marginBottom: 'var(--space-2)' }}>✨</div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    You&apos;re all caught up!
+                  </div>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', maxWidth: 280, margin: '6px auto 16px' }}>
+                    No unread alerts. Your Assistant will alert you when tasks are due or when focus blocks start.
+                  </div>
+                  <button className="btn btn-secondary btn-sm" onClick={sendTestAlert}>
+                    Send Test Alert
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                  {filteredNotifications.map(n => {
+                    const isUnread = n.status === 'unread'
+                    const style = typeStyles[n.type] || typeStyles.info
+
+                    return (
+                      <div
+                        key={n.id}
+                        className="card fade-in-up"
+                        style={{
+                          padding: 'var(--space-3) var(--space-4)',
+                          borderLeft: `4px solid ${style.color}`,
+                          background: isUnread ? 'linear-gradient(90deg, rgba(91,107,240,0.06), var(--bg-surface))' : 'var(--bg-surface)',
+                          cursor: 'pointer',
+                        }}
+                        onClick={() => markRead(n.id)}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                          <div
+                            style={{
+                              width: 36,
+                              height: 36,
+                              borderRadius: 'var(--radius-md)',
+                              background: style.bg,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: 18,
+                              flexShrink: 0,
+                            }}
+                          >
+                            {style.icon}
+                          </div>
+
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text-primary)' }}>
+                                {n.title}
+                              </div>
+                              <span style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>
+                                {n.createdAt ? formatDistanceToNow(new Date(n.createdAt), { addSuffix: true }) : ''}
+                              </span>
+                            </div>
+
+                            {n.body && (
+                              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', marginTop: 4, lineHeight: 1.5 }}>
+                                {n.body}
+                              </div>
+                            )}
+
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                <button
+                                  className="btn btn-secondary btn-sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    sessionStorage.setItem('srushti_prefill', `Regarding notification: "${n.title}" — let's handle this.`)
+                                    router.push('/chat')
+                                  }}
+                                  style={{ fontSize: '11px', padding: '2px 8px' }}
+                                >
+                                  Ask Assistant
+                                </button>
+                              </div>
+
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                {isUnread && (
+                                  <button
+                                    onClick={(e) => markRead(n.id, e)}
+                                    style={{ border: 'none', background: 'none', fontSize: '11px', color: 'var(--brand-primary)', cursor: 'pointer', fontWeight: 600 }}
+                                  >
+                                    Mark Read
+                                  </button>
+                                )}
+                                <button
+                                  onClick={(e) => deleteNotification(n.id, e)}
+                                  style={{ border: 'none', background: 'none', fontSize: '11px', color: 'var(--text-tertiary)', cursor: 'pointer' }}
+                                >
+                                  Dismiss
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+
+                  {notifications.length > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginTop: 'var(--space-4)' }}>
+                      {unreadList.length > 0 && (
+                        <button className="btn btn-secondary btn-sm" onClick={markAllRead}>
+                          Mark All as Read
+                        </button>
+                      )}
+                      <button className="btn btn-ghost btn-sm" onClick={clearAll} style={{ color: 'var(--status-error)' }}>
+                        Clear History
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
