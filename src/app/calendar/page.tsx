@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import AppHeader from '@/components/layout/AppHeader'
 import BottomNav from '@/components/layout/BottomNav'
@@ -18,6 +18,17 @@ import {
   subDays,
 } from 'date-fns'
 
+import {
+  getClientEvents,
+  getClientTasks,
+  getClientGoals,
+  getClientHabits,
+  createClientEvent,
+  deleteClientEvent,
+  toggleClientTask,
+  toggleClientHabit,
+} from '@/lib/data/clientData'
+
 interface Task {
   id: string
   title: string
@@ -25,8 +36,10 @@ interface Task {
   status: string
   scheduledStart?: string
   scheduledEnd?: string
+  deadline?: string
   estimatedMinutes?: number
   category?: string
+  createdAt?: string
 }
 
 interface Event {
@@ -38,6 +51,26 @@ interface Event {
   color?: string
   location?: string
   description?: string
+}
+
+interface Goal {
+  id: string
+  title: string
+  category?: string
+  priority: string
+  progress: number
+  targetDate?: string
+  status: string
+}
+
+interface Habit {
+  id: string
+  title: string
+  frequency: string
+  scheduledTime?: string
+  currentStreak: number
+  longestStreak: number
+  category?: string
 }
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -61,59 +94,58 @@ const typeIcons: Record<string, string> = {
 }
 
 const priorityColors: Record<string, string> = {
-  critical: 'var(--priority-critical)',
-  high: 'var(--priority-high)',
-  medium: 'var(--priority-medium)',
-  low: 'var(--priority-low)',
+  critical: 'var(--priority-critical, #EF4444)',
+  high: 'var(--priority-high, #F97316)',
+  medium: 'var(--priority-medium, #3B82F6)',
+  low: 'var(--priority-low, #10B981)',
 }
-
-import { getClientEvents, getClientTasks, createClientEvent, deleteClientEvent } from '@/lib/data/clientData'
 
 export default function CalendarPage() {
   const router = useRouter()
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState(new Date())
-  const [events, setEvents] = useState<any[]>([])
-  const [tasks, setTasks] = useState<any[]>([])
+  const [events, setEvents] = useState<Event[]>([])
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [goals, setGoals] = useState<Goal[]>([])
+  const [habits, setHabits] = useState<Habit[]>([])
   const [loading, setLoading] = useState(true)
   const [calendarMode, setCalendarMode] = useState<'week' | 'month'>('week')
   const [showAddEvent, setShowAddEvent] = useState(false)
+  const [activeMenuEventId, setActiveMenuEventId] = useState<string | null>(null)
+
   const [newEvent, setNewEvent] = useState({
     title: '',
-    type: 'class',
+    type: 'study',
     startTime: '09:00',
     endTime: '10:30',
     location: '',
   })
 
-  useEffect(() => {
-    const start = startOfMonth(currentDate)
-    const end = endOfMonth(currentDate)
+  const loadAllCalendarData = async () => {
+    try {
+      const [ev, ta, go, ha] = await Promise.all([
+        getClientEvents(),
+        getClientTasks(),
+        getClientGoals(),
+        getClientHabits(),
+      ])
 
-    // 1. Try local offline data first
-    Promise.all([getClientEvents(), getClientTasks()]).then(([ev, ta]) => {
-      if (ev) setEvents(ev)
-      if (ta) setTasks(ta)
+      if (ev) setEvents(ev as any)
+      if (ta) setTasks(ta as any)
+      if (go) setGoals(go as any)
+      if (ha) setHabits(ha as any)
+    } catch (e) {
+      console.error('Error loading calendar data:', e)
+    } finally {
       setLoading(false)
-    }).catch(() => {})
+    }
+  }
 
-    // 2. Also try API if reachable
-    Promise.all([
-      fetch(`/api/events?startDate=${start.toISOString()}&endDate=${end.toISOString()}`).then(r => r.json()).catch(() => null),
-      fetch('/api/tasks').then(r => r.json()).catch(() => null),
-    ])
-      .then(([ev, ta]) => {
-        if (Array.isArray(ev)) setEvents(ev)
-        if (Array.isArray(ta)) setTasks(ta)
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false))
+  useEffect(() => {
+    loadAllCalendarData()
 
     const handleDataChanged = () => {
-      Promise.all([getClientEvents(), getClientTasks()]).then(([ev, ta]) => {
-        if (ev) setEvents(ev)
-        if (ta) setTasks(ta)
-      }).catch(() => {})
+      loadAllCalendarData()
     }
     window.addEventListener('srushti_data_changed', handleDataChanged)
     return () => window.removeEventListener('srushti_data_changed', handleDataChanged)
@@ -129,16 +161,55 @@ export default function CalendarPage() {
   const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 0 })
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd })
 
+  // Smart multi-source resolver for any given day
   const getItemsForDay = (day: Date) => {
     const dayStr = format(day, 'yyyy-MM-dd')
-    const dayEvents = events.filter(e => format(new Date(e.startTime), 'yyyy-MM-dd') === dayStr)
-    const dayTasks = tasks.filter(t => t.scheduledStart && format(new Date(t.scheduledStart), 'yyyy-MM-dd') === dayStr)
-    return { dayEvents, dayTasks, total: dayEvents.length + dayTasks.length }
+
+    const dayEvents = events.filter(e => {
+      if (!e.startTime) return false
+      try {
+        return format(new Date(e.startTime), 'yyyy-MM-dd') === dayStr
+      } catch {
+        return false
+      }
+    })
+
+    const dayTasks = tasks.filter(t => {
+      try {
+        const startStr = t.scheduledStart ? format(new Date(t.scheduledStart), 'yyyy-MM-dd') : null
+        const deadStr = t.deadline ? format(new Date(t.deadline), 'yyyy-MM-dd') : null
+        const createdStr = t.createdAt ? format(new Date(t.createdAt), 'yyyy-MM-dd') : null
+        return startStr === dayStr || deadStr === dayStr || (!startStr && !deadStr && createdStr === dayStr)
+      } catch {
+        return false
+      }
+    })
+
+    const dayGoals = goals.filter(g => {
+      if (!g.targetDate) return false
+      try {
+        return format(new Date(g.targetDate), 'yyyy-MM-dd') === dayStr
+      } catch {
+        return false
+      }
+    })
+
+    const dayHabits = habits
+
+    return {
+      dayEvents,
+      dayTasks,
+      dayGoals,
+      dayHabits,
+      total: dayEvents.length + dayTasks.length + dayGoals.length,
+    }
   }
 
   const selectedDayItems = getItemsForDay(selectedDate)
   const selectedDayEvents = selectedDayItems.dayEvents
   const selectedDayTasks = selectedDayItems.dayTasks
+  const selectedDayGoals = selectedDayItems.dayGoals
+  const selectedDayHabits = selectedDayItems.dayHabits
 
   const prevPeriod = () => {
     if (calendarMode === 'month') {
@@ -160,11 +231,46 @@ export default function CalendarPage() {
     }
   }
 
+  const handleToggleTask = async (task: Task) => {
+    const isNowCompleted = task.status !== 'completed'
+    await toggleClientTask(task.id, isNowCompleted).catch(() => {})
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('srushti_data_changed'))
+    }
+    loadAllCalendarData()
+  }
+
+  const handleToggleHabit = async (habitId: string) => {
+    await toggleClientHabit(habitId, true).catch(() => {})
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('srushti_data_changed'))
+    }
+    loadAllCalendarData()
+  }
+
+  const handleDeleteEvent = async (id: string, title: string) => {
+    if (confirm(`Delete event "${title}"?`)) {
+      await deleteClientEvent(id).catch(() => {})
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('srushti_data_changed'))
+      }
+      loadAllCalendarData()
+    }
+  }
+
   const handleCreateEvent = async () => {
     if (!newEvent.title.trim()) return
     const dateStr = format(selectedDate, 'yyyy-MM-dd')
     const startIso = new Date(`${dateStr}T${newEvent.startTime}:00`).toISOString()
     const endIso = new Date(`${dateStr}T${newEvent.endTime}:00`).toISOString()
+
+    await createClientEvent({
+      title: newEvent.title,
+      type: newEvent.type,
+      startTime: startIso,
+      endTime: endIso,
+      location: newEvent.location,
+    }).catch(() => {})
 
     await fetch('/api/events', {
       method: 'POST',
@@ -176,22 +282,20 @@ export default function CalendarPage() {
         endTime: endIso,
         location: newEvent.location,
       }),
-    })
+    }).catch(() => {})
 
-    setNewEvent({ title: '', type: 'class', startTime: '09:00', endTime: '10:30', location: '' })
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('srushti_data_changed'))
+    }
+
+    setNewEvent({ title: '', type: 'study', startTime: '09:00', endTime: '10:30', location: '' })
     setShowAddEvent(false)
-
-    // Refresh
-    const start = startOfMonth(currentDate)
-    const end = endOfMonth(currentDate)
-    const res = await fetch(`/api/events?startDate=${start.toISOString()}&endDate=${end.toISOString()}`)
-    const json = await res.json()
-    setEvents(json)
+    loadAllCalendarData()
   }
 
   return (
     <div className="app-shell">
-      <AppHeader />
+      <AppHeader title="Calendar" subtitle="Schedule & Commitments" showBrand={false} showBack={false} />
 
       <div className="page-content">
         <div className="page-section" style={{ marginTop: 'var(--space-4)' }}>
@@ -215,7 +319,9 @@ export default function CalendarPage() {
                   {format(selectedDate, 'MMMM d, yyyy')}
                 </div>
                 <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginTop: 2 }}>
-                  {selectedDayItems.total === 0 ? 'No events scheduled' : `${selectedDayEvents.length} events · ${selectedDayTasks.length} tasks`}
+                  {selectedDayItems.total === 0
+                    ? 'No commitments scheduled'
+                    : `${selectedDayEvents.length} events · ${selectedDayTasks.length} tasks · ${selectedDayGoals.length} goals`}
                 </div>
               </div>
 
@@ -236,7 +342,7 @@ export default function CalendarPage() {
                   onClick={() => setShowAddEvent(true)}
                   style={{ fontSize: '11px', padding: '4px 10px' }}
                 >
-                  + Add
+                  + Add Event
                 </button>
               </div>
             </div>
@@ -248,27 +354,33 @@ export default function CalendarPage() {
               <button className="btn btn-secondary btn-sm" onClick={prevPeriod} style={{ width: 32, height: 32, padding: 0, fontSize: 16 }}>
                 ‹
               </button>
-              <span style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-md)', fontWeight: 700 }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text-primary)' }}>
                 {format(calendarMode === 'month' ? currentDate : selectedDate, 'MMMM yyyy')}
-              </span>
+              </div>
               <button className="btn btn-secondary btn-sm" onClick={nextPeriod} style={{ width: 32, height: 32, padding: 0, fontSize: 16 }}>
                 ›
               </button>
             </div>
 
-            {/* Switch between Week and Month */}
-            <div style={{ display: 'flex', background: 'var(--bg-muted)', borderRadius: 'var(--radius-full)', padding: '2px' }}>
+            {/* Toggle Week vs Month */}
+            <div
+              style={{
+                display: 'flex',
+                background: 'var(--bg-muted)',
+                borderRadius: 'var(--radius-md)',
+                padding: 2,
+              }}
+            >
               <button
                 onClick={() => setCalendarMode('week')}
                 style={{
                   padding: '4px 10px',
-                  borderRadius: 'var(--radius-full)',
+                  borderRadius: 'var(--radius-sm)',
                   fontSize: '11px',
-                  fontWeight: 600,
-                  background: calendarMode === 'week' ? 'var(--bg-surface)' : 'transparent',
-                  color: calendarMode === 'week' ? 'var(--brand-primary)' : 'var(--text-tertiary)',
-                  boxShadow: calendarMode === 'week' ? 'var(--shadow-sm)' : 'none',
+                  fontWeight: 700,
                   border: 'none',
+                  background: calendarMode === 'week' ? 'var(--brand-primary)' : 'transparent',
+                  color: calendarMode === 'week' ? 'white' : 'var(--text-secondary)',
                   cursor: 'pointer',
                 }}
               >
@@ -278,13 +390,12 @@ export default function CalendarPage() {
                 onClick={() => setCalendarMode('month')}
                 style={{
                   padding: '4px 10px',
-                  borderRadius: 'var(--radius-full)',
+                  borderRadius: 'var(--radius-sm)',
                   fontSize: '11px',
-                  fontWeight: 600,
-                  background: calendarMode === 'month' ? 'var(--bg-surface)' : 'transparent',
-                  color: calendarMode === 'month' ? 'var(--brand-primary)' : 'var(--text-tertiary)',
-                  boxShadow: calendarMode === 'month' ? 'var(--shadow-sm)' : 'none',
+                  fontWeight: 700,
                   border: 'none',
+                  background: calendarMode === 'month' ? 'var(--brand-primary)' : 'transparent',
+                  color: calendarMode === 'month' ? 'white' : 'var(--text-secondary)',
                   cursor: 'pointer',
                 }}
               >
@@ -293,60 +404,63 @@ export default function CalendarPage() {
             </div>
           </div>
 
-          {/* ── WEEK STRIP VIEW ─────────────────────────── */}
+          {/* ── WEEK VIEW HORIZONTAL STRIP ─────────────────────────── */}
           {calendarMode === 'week' ? (
             <div
-              className="card fade-in-up"
               style={{
-                padding: 'var(--space-3)',
                 display: 'grid',
                 gridTemplateColumns: 'repeat(7, 1fr)',
-                gap: 4,
+                gap: 'var(--space-1)',
                 marginBottom: 'var(--space-5)',
               }}
             >
-              {weekDays.map((day, i) => {
+              {weekDays.map((day, idx) => {
                 const isSel = isSameDay(day, selectedDate)
                 const isTod = isToday(day)
-                const { total } = getItemsForDay(day)
+                const { total, dayTasks, dayEvents, dayGoals } = getItemsForDay(day)
                 return (
                   <button
-                    key={i}
+                    key={idx}
                     onClick={() => setSelectedDate(day)}
                     style={{
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
-                      padding: '10px 4px',
+                      padding: '8px 2px',
                       borderRadius: 'var(--radius-lg)',
+                      border: isSel
+                        ? '2px solid var(--brand-primary)'
+                        : isTod
+                        ? '1.5px dashed var(--brand-primary)'
+                        : '1px solid var(--border-subtle)',
                       background: isSel
                         ? 'linear-gradient(135deg, var(--brand-primary), var(--brand-purple))'
                         : isTod
                         ? 'var(--bg-subtle)'
-                        : 'transparent',
-                      color: isSel ? 'white' : isTod ? 'var(--brand-primary)' : 'var(--text-primary)',
-                      border: isTod && !isSel ? '1.5px solid var(--brand-primary)' : '1.5px solid transparent',
+                        : 'var(--bg-surface)',
+                      color: isSel ? 'white' : 'var(--text-primary)',
                       cursor: 'pointer',
-                      transition: 'all var(--transition-spring)',
-                      boxShadow: isSel ? '0 4px 14px rgba(91, 107, 240, 0.35)' : 'none',
+                      transition: 'all var(--transition-fast)',
                     }}
                   >
-                    <span style={{ fontSize: '10px', fontWeight: 600, opacity: isSel ? 0.9 : 0.6 }}>
+                    <span style={{ fontSize: '10px', fontWeight: 600, opacity: isSel ? 0.9 : 0.6, textTransform: 'uppercase' }}>
                       {format(day, 'EEE')}
                     </span>
-                    <span style={{ fontSize: '16px', fontWeight: 800, marginTop: 2 }}>
+                    <span style={{ fontFamily: 'var(--font-display)', fontSize: '15px', fontWeight: 800, margin: '2px 0' }}>
                       {format(day, 'd')}
                     </span>
                     {total > 0 && (
-                      <span
-                        style={{
-                          width: 5,
-                          height: 5,
-                          borderRadius: '50%',
-                          background: isSel ? 'white' : 'var(--brand-accent)',
-                          marginTop: 4,
-                        }}
-                      />
+                      <div style={{ display: 'flex', gap: 2, marginTop: 2 }}>
+                        {dayEvents.length > 0 && (
+                          <span style={{ width: 4, height: 4, borderRadius: '50%', background: isSel ? '#93C5FD' : '#3B82F6' }} />
+                        )}
+                        {dayTasks.length > 0 && (
+                          <span style={{ width: 4, height: 4, borderRadius: '50%', background: isSel ? '#FDE68A' : '#F59E0B' }} />
+                        )}
+                        {dayGoals.length > 0 && (
+                          <span style={{ width: 4, height: 4, borderRadius: '50%', background: isSel ? '#FCA5A5' : '#EF4444' }} />
+                        )}
+                      </div>
                     )}
                   </button>
                 )
@@ -365,7 +479,7 @@ export default function CalendarPage() {
               <div className="calendar-grid">
                 {paddedMonthDays.map((day, i) => {
                   if (!day) return <div key={i} />
-                  const { total } = getItemsForDay(day)
+                  const { total, dayTasks, dayEvents, dayGoals } = getItemsForDay(day)
                   const isSel = isSameDay(day, selectedDate)
                   const isTod = isToday(day)
                   const isCurr = isSameMonth(day, currentDate)
@@ -374,12 +488,20 @@ export default function CalendarPage() {
                       key={i}
                       className={`calendar-day ${isTod ? 'today' : ''} ${isSel && !isTod ? 'selected' : ''} ${!isCurr ? 'other-month' : ''}`}
                       onClick={() => setSelectedDate(day)}
-                      style={{ height: 42, borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
+                      style={{ height: 44, borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
                     >
                       <span className="calendar-day-num" style={{ fontSize: '12px' }}>{format(day, 'd')}</span>
                       {total > 0 && (
                         <div style={{ display: 'flex', gap: 2, marginTop: 2 }}>
-                          <span style={{ width: 4, height: 4, borderRadius: '50%', background: isSel ? 'white' : 'var(--brand-primary)' }} />
+                          {dayEvents.length > 0 && (
+                            <span style={{ width: 4, height: 4, borderRadius: '50%', background: isSel ? 'white' : '#3B82F6' }} />
+                          )}
+                          {dayTasks.length > 0 && (
+                            <span style={{ width: 4, height: 4, borderRadius: '50%', background: isSel ? 'white' : '#F59E0B' }} />
+                          )}
+                          {dayGoals.length > 0 && (
+                            <span style={{ width: 4, height: 4, borderRadius: '50%', background: isSel ? 'white' : '#EF4444' }} />
+                          )}
                         </div>
                       )}
                     </div>
@@ -393,37 +515,90 @@ export default function CalendarPage() {
           <div style={{ marginBottom: 'var(--space-6)' }}>
             <div className="section-header">
               <div className="section-title">
-                {isToday(selectedDate) ? "Today's Agenda" : format(selectedDate, "EEE, MMM d") + ' Agenda'}
+                {isToday(selectedDate) ? "Today's Schedule & Reminders" : format(selectedDate, "EEE, MMM d") + ' Schedule'}
               </div>
               <span
                 className="section-action"
                 onClick={() => router.push('/chat')}
               >
-                Plan with Srushti ✨
+                Plan with AI ✨
               </span>
             </div>
 
-            {selectedDayEvents.length === 0 && selectedDayTasks.length === 0 ? (
+            {selectedDayEvents.length === 0 && selectedDayTasks.length === 0 && selectedDayGoals.length === 0 ? (
               <div className="card fade-in-up">
                 <div style={{ padding: 'var(--space-8) var(--space-4)', textAlign: 'center' }}>
                   <div style={{ fontSize: 36, marginBottom: 'var(--space-2)' }}>🌱</div>
                   <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    No commitments scheduled
+                    No events or tasks scheduled
                   </div>
-                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', maxWidth: 260, margin: '6px auto 16px' }}>
-                    Tap + Add above or ask Srushti to block study and focus sessions for this day.
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', maxWidth: 280, margin: '6px auto 16px' }}>
+                    Tap + Add Event above, or tell Srushti in Chat to schedule your classes, study sessions, and exams.
                   </div>
-                  <button
-                    className="btn btn-primary btn-sm"
-                    onClick={() => router.push('/chat')}
-                  >
-                    Auto-Plan with Srushti
-                  </button>
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => setShowAddEvent(true)}
+                    >
+                      + Add Event
+                    </button>
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={() => router.push('/chat')}
+                    >
+                      Auto-Plan in Chat
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                {/* Events list */}
+
+                {/* 1. Goal Deadlines on this day */}
+                {selectedDayGoals.map(goal => (
+                  <div
+                    key={goal.id}
+                    className="card fade-in-up"
+                    style={{
+                      borderLeft: '4px solid #EF4444',
+                      background: 'linear-gradient(90deg, rgba(239,68,68,0.08), var(--bg-surface))',
+                    }}
+                  >
+                    <div style={{ padding: 'var(--space-3) var(--space-4)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                      <div
+                        style={{
+                          width: 38,
+                          height: 38,
+                          borderRadius: 'var(--radius-md)',
+                          background: 'linear-gradient(135deg, #EF4444, #DC2626)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 18,
+                          color: 'white',
+                          flexShrink: 0,
+                        }}
+                      >
+                        🎯
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-base)', fontWeight: 800, color: 'var(--text-primary)' }}>
+                          {goal.title}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 2 }}>
+                          <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: '#EF4444' }}>
+                            🎯 Goal Target Date Due Today
+                          </span>
+                          <span className="badge badge-info" style={{ textTransform: 'capitalize' }}>
+                            {goal.category || 'Goal'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* 2. Events list */}
                 {selectedDayEvents.map(event => (
                   <div
                     key={event.id}
@@ -469,75 +644,132 @@ export default function CalendarPage() {
                           )}
                         </div>
                       </div>
+
+                      <div style={{ position: 'relative' }}>
+                        <button
+                          onClick={() => handleDeleteEvent(event.id, event.title)}
+                          style={{ border: 'none', background: 'transparent', color: 'var(--text-tertiary)', fontSize: 18, cursor: 'pointer', padding: 4 }}
+                          title="Delete event"
+                        >
+                          ×
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
 
-                {/* Scheduled Tasks for this day */}
-                {selectedDayTasks.map(task => (
-                  <div
-                    key={task.id}
-                    className="card fade-in-up"
-                    style={{
-                      borderLeft: `4px solid ${priorityColors[task.priority] || 'var(--brand-primary)'}`,
-                      opacity: task.status === 'completed' ? 0.75 : 1,
-                    }}
-                  >
-                    <div style={{ padding: 'var(--space-3) var(--space-4)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                      <div
-                        style={{
-                          width: 38,
-                          height: 38,
-                          borderRadius: 'var(--radius-md)',
-                          background: priorityColors[task.priority] || 'var(--brand-primary)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: 16,
-                          color: 'white',
-                          fontWeight: 700,
-                          flexShrink: 0,
-                        }}
-                      >
-                        ✓
-                      </div>
-
-                      <div style={{ flex: 1 }}>
-                        <div style={{
-                          fontFamily: 'var(--font-display)',
-                          fontSize: 'var(--text-base)',
-                          fontWeight: 700,
-                          color: 'var(--text-primary)',
-                          textDecoration: task.status === 'completed' ? 'line-through' : 'none',
-                        }}>
-                          {task.title}
+                {/* 3. Scheduled Tasks & Reminders for this day */}
+                {selectedDayTasks.map(task => {
+                  const isDone = task.status === 'completed'
+                  return (
+                    <div
+                      key={task.id}
+                      className="card fade-in-up"
+                      style={{
+                        borderLeft: `4px solid ${priorityColors[task.priority] || 'var(--brand-primary)'}`,
+                        opacity: isDone ? 0.7 : 1,
+                      }}
+                    >
+                      <div style={{ padding: 'var(--space-3) var(--space-4)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                        <div
+                          onClick={() => handleToggleTask(task)}
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 'var(--radius-full)',
+                            background: isDone ? 'var(--brand-accent)' : 'var(--bg-subtle)',
+                            border: `2px solid ${isDone ? 'var(--brand-accent)' : 'var(--border-default)'}`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 14,
+                            color: 'white',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            flexShrink: 0,
+                          }}
+                          title={isDone ? 'Mark pending' : 'Mark completed'}
+                        >
+                          {isDone ? '✓' : ''}
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 2 }}>
-                          {task.scheduledStart && (
-                            <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                              ⏰ {format(new Date(task.scheduledStart), 'h:mm a')}
+
+                        <div style={{ flex: 1 }}>
+                          <div style={{
+                            fontFamily: 'var(--font-display)',
+                            fontSize: 'var(--text-base)',
+                            fontWeight: 700,
+                            color: 'var(--text-primary)',
+                            textDecoration: isDone ? 'line-through' : 'none',
+                          }}>
+                            {task.title}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 2 }}>
+                            {task.scheduledStart && (
+                              <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                                ⏰ {format(new Date(task.scheduledStart), 'h:mm a')}
+                              </span>
+                            )}
+                            {task.deadline && (
+                              <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--priority-high)' }}>
+                                Due {format(new Date(task.deadline), 'h:mm a')}
+                              </span>
+                            )}
+                            {task.estimatedMinutes && (
+                              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
+                                {task.estimatedMinutes}m
+                              </span>
+                            )}
+                            <span
+                              style={{
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                textTransform: 'uppercase',
+                                color: priorityColors[task.priority],
+                              }}
+                            >
+                              {task.priority}
                             </span>
-                          )}
-                          {task.estimatedMinutes && (
-                            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
-                              {task.estimatedMinutes}m
-                            </span>
-                          )}
-                          <span
-                            style={{
-                              fontSize: '10px',
-                              fontWeight: 700,
-                              textTransform: 'uppercase',
-                              color: priorityColors[task.priority],
-                            }}
-                          >
-                            {task.priority}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* 4. Habits daily row */}
+            {selectedDayHabits.length > 0 && (
+              <div style={{ marginTop: 'var(--space-5)' }}>
+                <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>
+                  Daily Habit Commitments
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {selectedDayHabits.map(habit => (
+                    <div
+                      key={habit.id}
+                      className="card"
+                      style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontSize: 16 }}>🔁</span>
+                        <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-primary)' }}>
+                          {habit.title}
+                        </span>
+                        {habit.scheduledTime && (
+                          <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                            ⏰ {habit.scheduledTime}
                           </span>
-                        </div>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--brand-warm)' }}>
+                          🔥 {habit.currentStreak}d
+                        </span>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
           </div>
