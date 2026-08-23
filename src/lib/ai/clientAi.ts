@@ -9,6 +9,7 @@ export interface ClientAICallback {
 
 export interface OnboardingAnswers {
   name: string
+  assistantName?: string
   role: string
   mainGoals: string
   dailyRoutine: {
@@ -399,6 +400,10 @@ export async function generateInitialPlanFromOnboarding(data: OnboardingAnswers)
 
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem('srushti_user_name', data.name.trim() || 'Sanket')
+    if (data.assistantName?.trim()) {
+      localStorage.setItem('srushti_assistant_name', data.assistantName.trim())
+      await localDb.preferences.put({ key: 'assistant_name', value: data.assistantName.trim() }).catch(() => {})
+    }
     localStorage.setItem('srushti_onboarding_done', 'true')
     if (data.apiKey) {
       localStorage.setItem('srushti_gemini_api_key', data.apiKey.trim())

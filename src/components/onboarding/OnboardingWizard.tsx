@@ -143,6 +143,21 @@ export default function OnboardingWizard({ onCompleted }: OnboardingWizardProps)
                 style={{ width: '100%', fontSize: '15px' }}
               />
             </div>
+
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
+                Name Your AI Assistant (Default: Srushti)
+              </label>
+              <input
+                type="text"
+                className="input"
+                value={answers.assistantName || ''}
+                onChange={e => setAnswers({ ...answers, assistantName: e.target.value })}
+                placeholder="e.g. Srushti, Jarvis, Friday, Maya..."
+                style={{ width: '100%', fontSize: '15px' }}
+              />
+            </div>
+
             <div>
               <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
                 Your Primary Role / Profession
