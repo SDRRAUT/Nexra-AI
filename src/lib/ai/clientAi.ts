@@ -266,8 +266,14 @@ Always speak directly, warmly, and helpfully as ${assistantName}. Keep answers f
     topP: 0.95,
   }
 
-  // Reliable production models in order of speed and compatibility
-  const candidateModels = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro']
+  // Active production models for Google Gemini API
+  const candidateModels = [
+    'gemini-3.6-flash',
+    'gemini-3.5-flash',
+    'gemini-3-flash-preview',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash'
+  ]
   let response: Response | null = null
   let lastErr = ''
 
