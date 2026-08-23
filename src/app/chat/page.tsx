@@ -232,12 +232,18 @@ export default function ChatPage() {
     return () => clearInterval(interval)
   }, [isLoading, isStreaming])
 
-  // Check for prefill from other screens
+  // Check for prefill from other screens (e.g. Suggestions, Act buttons, notifications)
   useEffect(() => {
     const prefill = sessionStorage.getItem('srushti_prefill')
     if (prefill) {
       sessionStorage.removeItem('srushti_prefill')
-      sendMessage(prefill)
+      setInput(prefill)
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus()
+          adjustTextareaHeight()
+        }
+      }, 150)
     }
   }, [activeConvId])
 
@@ -665,7 +671,15 @@ export default function ChatPage() {
                 <button
                   key={i}
                   className="quick-action-chip"
-                  onClick={() => sendMessage(action)}
+                  onClick={() => {
+                    setInput(action)
+                    setTimeout(() => {
+                      if (inputRef.current) {
+                        inputRef.current.focus()
+                        adjustTextareaHeight()
+                      }
+                    }, 50)
+                  }}
                   id={`quick-action-${i}`}
                 >
                   {action}
