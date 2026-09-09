@@ -84,7 +84,7 @@ const PlusIcon = () => (
   </svg>
 )
 
-import { getClientDashboard, updateClientTask, deleteClientTask, createClientTask, type DashboardData as LocalDashData } from '@/lib/data/clientData'
+import { getClientDashboard, updateClientTask, toggleClientTask, deleteClientTask, createClientTask, type DashboardData as LocalDashData } from '@/lib/data/clientData'
 import OnboardingWizard from '@/components/onboarding/OnboardingWizard'
 
 export default function HomePage() {
@@ -116,7 +116,7 @@ export default function HomePage() {
             progressPercent: localData.progressPercent,
             nextTask,
           },
-          critical: todayTasks.filter(t => t.priority === 'critical' || t.priority === 'high'),
+          critical: todayTasks.filter(t => (t.priority === 'critical' || t.priority === 'high') && t.status !== 'completed'),
           upcoming: todayTasks,
           goals: (localData.goals || []) as any,
           atRisk: 0,
@@ -141,7 +141,12 @@ export default function HomePage() {
         fetch('/api/dashboard').then(r => r.json()).catch(() => null),
         fetch('/api/briefing').then(r => r.json()).catch(() => null),
       ])
-      if (dashRes && dashRes.today) setData(dashRes)
+      if (dashRes && dashRes.today) {
+        if (Array.isArray(dashRes.critical)) {
+          dashRes.critical = dashRes.critical.filter((t: any) => t.status !== 'completed')
+        }
+        setData(dashRes)
+      }
       if (briefRes && briefRes.briefingTitle) setBriefing(briefRes)
     } catch (e) {
       console.error(e)
@@ -175,12 +180,12 @@ export default function HomePage() {
   }, [])
 
   const handleToggleTask = async (task: Task) => {
-    const newStatus = task.status === 'completed' ? 'planned' : 'completed'
-    await updateClientTask(task.id, { status: newStatus }).catch(() => {})
+    const isNowCompleted = task.status !== 'completed'
+    await toggleClientTask(task.id, isNowCompleted).catch(() => {})
     await fetch(`/api/tasks/${task.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus }),
+      body: JSON.stringify({ status: isNowCompleted ? 'completed' : 'planned' }),
     }).catch(() => {})
     fetchDashboard()
   }
@@ -472,21 +477,49 @@ export default function HomePage() {
         )}
 
         {/* ── CRITICAL ITEMS ─────────────────────────── */}
-        {(data?.critical?.length ?? 0) > 0 && (
+        {(data?.critical?.filter(t => t.status !== 'completed')?.length ?? 0) > 0 && (
           <div className="page-section">
             <div className="section-header">
               <div className="section-title">🔴 Urgent Attention</div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-              {data!.critical.map(item => (
-                <div key={item.id} className="critical-card fade-in-up">
-                  <div className="critical-icon">🚨</div>
+              {data!.critical.filter(t => t.status !== 'completed').map(item => (
+                <div key={item.id} className="critical-card fade-in-up" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleTask(item)}
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 'var(--radius-full)',
+                      background: 'rgba(239, 68, 68, 0.12)',
+                      border: '2px solid var(--priority-critical, #EF4444)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      color: 'var(--priority-critical, #EF4444)',
+                      fontWeight: 800,
+                      fontSize: 14,
+                      flexShrink: 0,
+                    }}
+                    title="Mark task completed"
+                  >
+                    ✓
+                  </button>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, fontSize: 'var(--text-base)', color: 'var(--text-primary)' }}>{item.title}</div>
                     <div style={{ fontSize: 'var(--text-xs)', color: 'var(--priority-critical)', marginTop: 2 }}>
                       {item.deadline ? `Due ${format(new Date(item.deadline), 'EEE MMM d, h:mm a')}` : 'Immediate priority'}
                     </div>
                   </div>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => handleToggleTask(item)}
+                    style={{ fontSize: '11px', padding: '4px 10px', whiteSpace: 'nowrap' }}
+                  >
+                    Done
+                  </button>
                 </div>
               ))}
             </div>

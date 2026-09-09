@@ -74,7 +74,7 @@ export async function getClientDashboard(): Promise<DashboardData> {
       summary: totalTodayCount > 0 
         ? `You have ${totalTodayCount - completedTodayCount} tasks remaining for today.`
         : 'Your schedule is clear. Plan your next goals with Srushti.',
-      priorities: tasks.filter(t => t.priority === 'high' || t.priority === 'critical').map(t => t.title),
+      priorities: tasks.filter(t => (t.priority === 'high' || t.priority === 'critical') && t.status !== 'completed').map(t => t.title),
       focusBlock: '09:00 AM - 11:30 AM (Deep Focus)',
     },
   }
