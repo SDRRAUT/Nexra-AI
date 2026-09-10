@@ -248,7 +248,7 @@ export default function FilesPage() {
         showBrand={false}
       />
 
-      <div className="page-content" style={{ paddingBottom: 110 }}>
+      <div className="page-content" style={{ paddingBottom: 120 }}>
         {/* Hidden native file input */}
         <input
           type="file"
@@ -258,85 +258,89 @@ export default function FilesPage() {
           multiple
         />
 
-        {/* ── SPOTLIGHT INSTANT SEARCH BOX ─────────────────────────── */}
-        <div style={{ position: 'sticky', top: 'var(--header-height, 56px)', zIndex: 100, padding: 'var(--space-2) 0 var(--space-4)', background: 'var(--bg-primary)' }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              background: 'var(--bg-card)',
-              border: searchQuery ? '1.5px solid var(--brand-primary)' : '1px solid var(--border-subtle)',
-              borderRadius: 'var(--radius-xl)',
-              padding: '10px 16px',
-              boxShadow: searchQuery ? '0 0 0 3px rgba(99, 102, 241, 0.15)' : '0 4px 20px -4px rgba(0, 0, 0, 0.06)',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            <span style={{ fontSize: 20, marginRight: 10, opacity: 0.8 }}>⚡</span>
-            <input
-              ref={searchInputRef}
-              type="text"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Type letters to find any doc instantly... (e.g. math, syllabus)"
+        <div className="page-section" style={{ marginTop: 'var(--space-2)' }}>
+          {/* ── SPOTLIGHT INSTANT SEARCH BOX ─────────────────────────── */}
+          <div style={{ position: 'sticky', top: 0, zIndex: 100, padding: 'var(--space-2) 0 var(--space-3)', background: 'var(--bg-base)' }}>
+            <div
               style={{
-                background: 'transparent',
-                border: 'none',
-                outline: 'none',
-                color: 'var(--text-primary)',
-                fontSize: 'var(--text-base)',
-                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                background: 'var(--bg-surface)',
+                border: searchQuery ? '1.5px solid var(--brand-primary)' : '1px solid var(--border-default)',
+                borderRadius: 'var(--radius-xl)',
+                padding: '10px 14px',
+                boxShadow: searchQuery ? '0 0 0 3px rgba(91, 107, 240, 0.15)' : 'var(--shadow-sm)',
+                transition: 'all var(--transition-fast)',
                 width: '100%',
+                boxSizing: 'border-box',
               }}
-            />
+            >
+              <span style={{ fontSize: 18, marginRight: 8, opacity: 0.85, flexShrink: 0 }}>⚡</span>
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search docs, notes, PDFs by letter..."
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  color: 'var(--text-primary)',
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: 600,
+                  width: '100%',
+                  minWidth: 0,
+                }}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setSearchQuery('')}
+                  style={{ padding: '2px 8px', fontSize: '13px', color: 'var(--text-tertiary)', flexShrink: 0 }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* Real-time search telemetry info */}
             {searchQuery && (
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={() => setSearchQuery('')}
-                style={{ padding: '2px 8px', fontSize: '13px', color: 'var(--text-tertiary)' }}
-              >
-                ✕
-              </button>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, padding: '0 4px', fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                <span>
+                  Found <strong>{filteredDocs.length}</strong> matching {filteredDocs.length === 1 ? 'doc' : 'docs'}
+                </span>
+                <span style={{ color: 'var(--brand-accent)' }}>⚡ Instant (&lt;1ms)</span>
+              </div>
             )}
           </div>
 
-          {/* Real-time search telemetry info */}
-          {searchQuery && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, padding: '0 6px', fontSize: '11px', color: 'var(--text-tertiary)' }}>
-              <span>
-                Found <strong>{filteredDocs.length}</strong> matching {filteredDocs.length === 1 ? 'doc' : 'docs'}
-              </span>
-              <span style={{ color: 'var(--brand-accent)' }}>⚡ Instant Keystroke Match (&lt;1ms)</span>
-            </div>
-          )}
-        </div>
+          {/* ── ACTION BAR: NEW NOTE & UPLOAD FILE ────────────────────── */}
+          <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                setEditingDoc(null)
+                setIsEditorOpen(true)
+              }}
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 14px', borderRadius: 'var(--radius-lg)', minWidth: 0 }}
+            >
+              <span>📝</span>
+              <span style={{ fontWeight: 700, fontSize: 'var(--text-sm)' }}>+ New Note</span>
+            </button>
 
-        {/* ── ACTION BAR: NEW NOTE & UPLOAD FILE ────────────────────── */}
-        <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => {
-              setEditingDoc(null)
-              setIsEditorOpen(true)
-            }}
-            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 16px' }}
-          >
-            <span>📝</span>
-            <span style={{ fontWeight: 700 }}>+ New Note</span>
-          </button>
-
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => fileInputRef.current?.click()}
-            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 16px' }}
-          >
-            <span>📁</span>
-            <span style={{ fontWeight: 700 }}>Upload File</span>
-          </button>
-        </div>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => fileInputRef.current?.click()}
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 14px', borderRadius: 'var(--radius-lg)', minWidth: 0 }}
+            >
+              <span>📁</span>
+              <span style={{ fontWeight: 700, fontSize: 'var(--text-sm)' }}>Upload File</span>
+            </button>
+          </div>
 
         {/* ── CATEGORY FILTER PILLS ─────────────────────────────────── */}
         <div
@@ -364,7 +368,7 @@ export default function FilesPage() {
                 className="quick-action-chip"
                 onClick={() => setActiveCategory(cat.id as FileCategory)}
                 style={{
-                  background: isSelected ? 'var(--brand-primary)' : 'var(--bg-card)',
+                  background: isSelected ? 'var(--brand-primary)' : 'var(--bg-surface)',
                   color: isSelected ? 'white' : 'var(--text-secondary)',
                   border: isSelected ? '1px solid var(--brand-primary)' : '1px solid var(--border-subtle)',
                   fontWeight: isSelected ? 700 : 500,
@@ -440,7 +444,7 @@ export default function FilesPage() {
             <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-lg)', fontWeight: 800, color: 'var(--text-primary)' }}>
               {searchQuery ? `No files matching "${searchQuery}"` : 'Your FastVault is empty'}
             </div>
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', maxWidth: 360, margin: '8px auto var(--space-5)' }}>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', maxWidth: 360, margin: '8px auto var(--space-5)', lineHeight: 1.5 }}>
               {searchQuery
                 ? 'Try searching with a shorter term or check spelling.'
                 : 'Store your exam notes, PDFs, study sheets, and photos offline with sub-millisecond search access.'}
@@ -448,14 +452,15 @@ export default function FilesPage() {
 
             {!searchQuery && (
               <div>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 10 }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 12 }}>
                   Try a Starter Template:
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', justifyContent: 'center' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', maxWidth: 280, margin: '0 auto' }}>
                   <button
                     type="button"
                     className="btn btn-secondary btn-sm"
                     onClick={() => handleSeedTemplate('formula')}
+                    style={{ width: '100%', justifyContent: 'center' }}
                   >
                     📐 Math & Physics Formulas
                   </button>
@@ -463,6 +468,7 @@ export default function FilesPage() {
                     type="button"
                     className="btn btn-secondary btn-sm"
                     onClick={() => handleSeedTemplate('project')}
+                    style={{ width: '100%', justifyContent: 'center' }}
                   >
                     💻 App Architecture Spec
                   </button>
@@ -470,6 +476,7 @@ export default function FilesPage() {
                     type="button"
                     className="btn btn-secondary btn-sm"
                     onClick={() => handleSeedTemplate('notes')}
+                    style={{ width: '100%', justifyContent: 'center' }}
                   >
                     📋 Sprint Checkpoints
                   </button>
@@ -604,6 +611,7 @@ export default function FilesPage() {
             })}
           </div>
         )}
+        </div>
       </div>
 
       {/* ── MODALS ───────────────────────────────────────────────── */}

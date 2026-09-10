@@ -94,7 +94,7 @@ export default function NoteEditorModal({
           maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
-          background: 'var(--bg-card)',
+          background: 'var(--bg-surface)',
           border: '1px solid var(--border-subtle)',
           borderRadius: 'var(--radius-xl)',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
@@ -111,7 +111,7 @@ export default function NoteEditorModal({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            background: 'var(--bg-secondary)',
+            background: 'var(--bg-subtle)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
@@ -215,7 +215,7 @@ export default function NoteEditorModal({
             display: 'flex',
             justifyContent: 'flex-end',
             gap: 'var(--space-3)',
-            background: 'var(--bg-secondary)',
+            background: 'var(--bg-subtle)',
           }}
         >
           <button type="button" className="btn btn-secondary btn-sm" onClick={onClose} disabled={saving}>

@@ -119,7 +119,7 @@ export default function FileViewerModal({
           maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
-          background: 'var(--bg-card)',
+          background: 'var(--bg-surface)',
           border: '1px solid var(--border-subtle)',
           borderRadius: 'var(--radius-xl)',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.45)',
@@ -136,7 +136,7 @@ export default function FileViewerModal({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            background: 'var(--bg-secondary)',
+            background: 'var(--bg-subtle)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minWidth: 0 }}>
@@ -210,7 +210,7 @@ export default function FileViewerModal({
 
           {/* Image Display */}
           {isImage && doc.dataUrl && (
-            <div style={{ textAlign: 'center', background: 'var(--bg-primary)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
+            <div style={{ textAlign: 'center', background: 'var(--bg-base)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
               <img
                 src={doc.dataUrl}
                 alt={doc.title}
@@ -255,7 +255,7 @@ export default function FileViewerModal({
           {doc.content ? (
             <div
               style={{
-                background: isCode ? '#0F172A' : 'var(--bg-secondary)',
+                background: isCode ? '#0F172A' : 'var(--bg-subtle)',
                 color: isCode ? '#E2E8F0' : 'var(--text-primary)',
                 fontFamily: isCode ? 'monospace' : 'inherit',
                 fontSize: '13px',
@@ -288,7 +288,7 @@ export default function FileViewerModal({
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: 'var(--space-2)',
-            background: 'var(--bg-secondary)',
+            background: 'var(--bg-subtle)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
