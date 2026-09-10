@@ -125,10 +125,18 @@ export interface LocalExpense {
 export interface LocalDocument {
   id: string
   title: string
-  type?: string
+  type: 'note' | 'pdf' | 'image' | 'code' | 'sheet' | 'link' | 'other' | string
+  mimeType?: string
+  size?: number
+  content?: string
+  dataUrl?: string
+  tags?: string[]
+  isFavorite?: boolean
+  pinned?: boolean
   expiryDate?: string
   notes?: string
   createdAt: string
+  updatedAt?: string
 }
 
 export interface LocalPreference {

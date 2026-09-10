@@ -19,6 +19,14 @@ const SECTIONS = [
     title: 'Daily Life & Routines',
     items: [
       {
+        icon: '🎯',
+        title: 'Goals & Milestones',
+        desc: 'Long-term targets, horizons & breakdown',
+        path: '/goals',
+        gradient: 'linear-gradient(135deg, #8B5CF6, #6366F1)',
+        badge: 'Vision',
+      },
+      {
         icon: '🔁',
         title: 'Habits & Streaks',
         desc: 'Daily routines and consistency tracking',
