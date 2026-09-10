@@ -1,6 +1,25 @@
 {
   "name": "srushti-ai",
-  "version": "0.1.0",
+  "version": "1.0.0",
+  "description": "Next-generation autonomous life, study, and schedule OS with offline procedural soundscapes and Android APK support",
+  "author": "SDR RAUT",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SDRRAUT/SRUSHTI-AI.git"
+  },
+  "keywords": [
+    "ai-assistant",
+    "nextjs16",
+    "react19",
+    "capacitor",
+    "productivity",
+    "pomodoro",
+    "soundscapes",
+    "offline-first",
+    "calendar",
+    "life-radar"
+  ],
   "private": true,
   "scripts": {
     "dev": "next dev -H 0.0.0.0",
