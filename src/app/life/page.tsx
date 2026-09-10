@@ -39,7 +39,7 @@ export default function LifePage() {
 
           {/* Prompt cards */}
           <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 'var(--space-3)' }}>
-            Ask Srushti
+            Ask Nexra
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>

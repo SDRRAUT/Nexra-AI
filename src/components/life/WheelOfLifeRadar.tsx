@@ -249,13 +249,13 @@ export default function WheelOfLifeRadar() {
       {/* AI Life Coaching Diagnosis */}
       <div className="wheel-coaching-box">
         <div className="wheel-coach-title">
-          <span>🧠 Srushti's Balance Insight</span>
+          <span>🧠 Nexra's Balance Insight</span>
         </div>
         <p className="wheel-coach-desc">
           Your <strong>{highest.name}</strong> is leading at <strong>{highest.score}%</strong>, while <strong>{lowest.name}</strong> is trailing at <strong>{lowest.score}%</strong>. Even a 20-minute daily commitment can restore alignment.
         </p>
         <button className="wheel-coach-btn" onClick={handleFixBalance}>
-          <span>✨</span> Ask Srushti to Balance My Life
+          <span>✨</span> Ask Nexra to Balance My Life
         </button>
       </div>
     </div>

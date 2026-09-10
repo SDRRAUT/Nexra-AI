@@ -21,7 +21,7 @@ export default function NotFound() {
         Page Not Found
       </h1>
       <p style={{ fontSize: '14px', color: '#64748B', maxWidth: '340px', margin: '0 0 24px 0', lineHeight: 1.5 }}>
-        We couldn&apos;t find what you were looking for. Let Srushti guide you back to your agenda.
+        We couldn&apos;t find what you were looking for. Let Nexra guide you back to your agenda.
       </p>
       <Link
         href="/"

@@ -60,7 +60,7 @@ export default function AppHeader({ title, subtitle, showBack, showBrand = true,
   const [unreadCount, setUnreadCount] = useState(0)
   const [showThemes, setShowThemes] = useState(false)
   const [activeTheme, setActiveTheme] = useState('indigo')
-  const [assistantName, setAssistantName] = useState('Srushti')
+  const [assistantName, setAssistantName] = useState('Nexra')
   const [userName, setUserName] = useState('You')
   const themeMenuRef = useRef<HTMLDivElement>(null)
 
@@ -72,8 +72,13 @@ export default function AppHeader({ title, subtitle, showBack, showBrand = true,
     document.body.setAttribute('data-theme', savedTheme)
 
     const loadProfileData = () => {
-      const name = localStorage.getItem('srushti_assistant_name') || 'Srushti'
-      setAssistantName(name)
+      const stored = localStorage.getItem('srushti_assistant_name')
+      if (!stored || stored === 'Srushti' || stored === 'Spark' || stored === 'Personal Assistant') {
+        setAssistantName('Nexra')
+        localStorage.setItem('srushti_assistant_name', 'Nexra')
+      } else {
+        setAssistantName(stored)
+      }
       const user = localStorage.getItem('srushti_user_name') || 'You'
       setUserName(user)
     }
@@ -150,7 +155,7 @@ export default function AppHeader({ title, subtitle, showBack, showBrand = true,
               </div>
               <div className="app-header-team-pill">
                 <span className="team-pill-dot" />
-                <span>BY TEAM SDR</span>
+                <span>The next layer of your life.</span>
               </div>
             </div>
           </div>

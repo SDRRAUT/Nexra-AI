@@ -241,7 +241,7 @@ export default function ProductivityPage() {
                       Request Deep AI Audit
                     </div>
                     <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', marginTop: 2 }}>
-                      Ask Srushti to analyze bottlenecks and suggest an optimal work rhythm.
+                      Ask Nexra to analyze bottlenecks and suggest an optimal work rhythm.
                     </div>
                   </div>
                   <button className="btn btn-primary btn-sm" style={{ fontSize: '11px' }}>

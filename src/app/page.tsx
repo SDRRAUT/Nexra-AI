@@ -453,7 +453,7 @@ export default function HomePage() {
 
                 <div className="home-hero-sub">
                   {totalCount === 0
-                    ? "All clear! Plan a focus block or chat with Srushti."
+                    ? "All clear! Plan a focus block or chat with Nexra."
                     : `You completed ${completedCount}/${totalCount} tasks today · ${progressPercent}% focus flow`}
                 </div>
               </div>
@@ -724,7 +724,7 @@ export default function HomePage() {
                 <span style={{ fontSize: 22, flexShrink: 0 }}>🌱</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: '10px', fontWeight: 800, color: '#6366F1', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    Srushti Suggests
+                    Nexra Suggests
                   </div>
                   <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {briefing.aiRecommendation}
@@ -856,7 +856,7 @@ export default function HomePage() {
                 {taskFilter === 'completed' ? 'No completed tasks yet' : 'All clear for today!'}
               </div>
               <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: 3 }}>
-                {taskFilter === 'completed' ? 'Check off items as you finish them!' : 'Tap + Add above or ask Srushti in chat.'}
+                {taskFilter === 'completed' ? 'Check off items as you finish them!' : 'Tap + Add above or ask Nexra in chat.'}
               </div>
             </div>
           ) : (

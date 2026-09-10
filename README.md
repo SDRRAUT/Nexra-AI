@@ -1,7 +1,7 @@
 <div align="center">
 
-# 🌟 Srushti AI (Spark)
-### Next-Generation Autonomous Life, Study & Schedule OS
+# 🌟 Nexra
+### The next layer of your life.
 
 [![Next.js 16](https://img.shields.io/badge/Next.js-16.3-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
 [![React 19](https://img.shields.io/badge/React-19.2-61DAFB?style=for-the-badge&logo=react)](https://react.dev/)
@@ -42,7 +42,7 @@
 
 ### 🎙️ 5. Multimodal Voice & AI Assistant
 - **Voice-to-Task Synthesis:** Native speech-to-text integration through Android SpeechRecognizer and Web Speech API fallbacks.
-- **Context-Aware Recommendations:** Srushti evaluates missed tasks, streaks, and current energy levels to offer actionable suggestions.
+- **Context-Aware Recommendations:** Nexra evaluates missed tasks, streaks, and current energy levels to offer actionable suggestions.
 
 ### 📱 6. True Offline-First Architecture
 - **Dexie.js / IndexedDB Backbone:** All tasks, events, habits, goals, and logs are persisted instantly on the device.
@@ -111,7 +111,7 @@
 
 ## 📱 Android APK Build
 
-Srushti AI includes native Android integration configured through Capacitor.
+Nexra includes native Android integration configured through Capacitor.
 
 ### 1. Build Static Web Assets
 ```bash

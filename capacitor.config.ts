@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli'
 
 const config: CapacitorConfig = {
   appId: 'com.sdr.srushtiai',
-  appName: 'Personal Assistant',
+  appName: 'Nexra',
   webDir: 'out',
   server: {
     androidScheme: 'https',

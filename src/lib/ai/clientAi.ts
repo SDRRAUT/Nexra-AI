@@ -251,7 +251,7 @@ export async function streamClientChat(
   ])
 
   const userName = users[0]?.name || (typeof localStorage !== 'undefined' ? localStorage.getItem('srushti_user_name') : 'Sanket') || 'Sanket'
-  const assistantName = (typeof localStorage !== 'undefined' ? localStorage.getItem('srushti_assistant_name') : 'Srushti') || 'Srushti'
+  const assistantName = (typeof localStorage !== 'undefined' ? localStorage.getItem('srushti_assistant_name') : 'Nexra') || 'Nexra'
   const timezone = users[0]?.timezone || 'Asia/Kolkata'
 
   const contextPrompt = `
@@ -431,7 +431,7 @@ export async function generateInitialPlanFromOnboarding(data: OnboardingAnswers)
   habitsCount: number
 }> {
   const userName = data.name.trim() || 'You'
-  const assistantName = data.assistantName?.trim() || 'Srushti'
+  const assistantName = data.assistantName?.trim() || 'Nexra'
 
   // 1. Save User Profile
   await localDb.user.put({

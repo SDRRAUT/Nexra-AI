@@ -215,7 +215,7 @@ export default function ScheduleOptimizerModal({
               </span>
             ) : (
               <span>
-                Your schedule is reasonably balanced, but Srushti can buffer your schedule for optimal retention and focus.
+                Your schedule is reasonably balanced, but Nexra can buffer your schedule for optimal retention and focus.
               </span>
             )}
           </div>

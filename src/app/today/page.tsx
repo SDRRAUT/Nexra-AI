@@ -194,11 +194,11 @@ export default function TodayPage() {
               <div className="empty-sub">
                 {filter === 'completed'
                   ? 'Complete tasks to see them here.'
-                  : "No tasks for today. Talk to Srushti to plan your day."}
+                  : "No tasks for today. Talk to Nexra to plan your day."}
               </div>
               {filter !== 'completed' && (
                 <button className="btn btn-primary" style={{ marginTop: 'var(--space-4)' }} onClick={() => router.push('/chat')}>
-                  Plan with Srushti
+                  Plan with Nexra
                 </button>
               )}
             </div>
@@ -251,7 +251,7 @@ export default function TodayPage() {
           }} onClick={() => router.push('/chat')}>
             <div>
               <div style={{ fontWeight: 600, fontSize: 'var(--text-base)', color: 'var(--text-primary)' }}>Need to change plans?</div>
-              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-tertiary)', marginTop: 2 }}>Tell Srushti and I'll adjust</div>
+              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-tertiary)', marginTop: 2 }}>Tell Nexra and I&apos;ll adjust</div>
             </div>
             <div style={{ fontSize: 24 }}>💬</div>
           </div>
