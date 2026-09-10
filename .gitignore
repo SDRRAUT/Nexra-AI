@@ -39,3 +39,18 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# IDE & Editor files
+.idea/
+.vscode/
+*.iml
+
+# Local database files
+*.db
+*.db-journal
+
+# Internal docs, prompts & planning markdown files (keep only README.md and AGENTS.md)
+*.md
+!README.md
+!AGENTS.md
+
