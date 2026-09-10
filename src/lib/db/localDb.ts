@@ -187,10 +187,13 @@ export async function ensureInitialData() {
 
   const userCount = await localDb.user.count()
   if (userCount === 0) {
-    const customName = typeof localStorage !== 'undefined' ? localStorage.getItem('srushti_user_name') || 'Sanket' : 'Sanket'
+    const customName =
+      typeof localStorage !== 'undefined'
+        ? localStorage.getItem('nexra_user_name') || localStorage.getItem('srushti_user_name') || ''
+        : ''
     await localDb.user.add({
       id: 'default-user',
-      name: customName,
+      name: customName || 'Friend',
       timezone: 'Asia/Kolkata',
       aiAutonomy: 'autonomous',
       notifications: true,

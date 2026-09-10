@@ -390,7 +390,8 @@ export default function SettingsPage() {
 
       if (typeof localStorage !== 'undefined') {
         localStorage.clear()
-        localStorage.setItem('srushti_onboarding_done', 'false')
+        localStorage.removeItem('nexra_onboarding_done')
+        localStorage.removeItem('srushti_onboarding_done')
       }
 
       await fetch('/api/settings/backup', { method: 'DELETE' }).catch(() => {})
@@ -399,6 +400,14 @@ export default function SettingsPage() {
     } catch {
       alert('Failed to reset.')
     }
+  }
+
+  const handleReplayOnboarding = () => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('nexra_onboarding_done')
+      localStorage.removeItem('srushti_onboarding_done')
+    }
+    window.location.href = '/'
   }
 
   const ToggleSwitch = ({ checked, onChange }: { checked: boolean; onChange: (c: boolean) => void }) => (
@@ -871,8 +880,32 @@ export default function SettingsPage() {
           {/* ── ONCE ADDED, API KEY OPTION IS AT THE BOTTOM WITH REDUCED OPACITY ── */}
           {apiKeyStatus.hasKey && renderApiKeySection(true)}
 
+          {/* ── REPLAY ONBOARDING ──────────────────────── */}
+          <div style={{ marginTop: 'var(--space-4)' }}>
+            <div className="card" style={{ padding: 'var(--space-4) var(--space-5)', border: '1px solid rgba(99, 102, 241, 0.25)', background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.06) 0%, rgba(236, 72, 153, 0.04) 100%)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: '#4F46E5', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>✨</span> Replay Onboarding Guide
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: 2 }}>
+                    Walk through the 5-step intro slides and reconfigure your companion profile
+                  </div>
+                </div>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={handleReplayOnboarding}
+                  id="replay-onboarding-btn"
+                  style={{ borderRadius: 999, fontWeight: 700, borderColor: 'rgba(99, 102, 241, 0.3)', color: '#4F46E5' }}
+                >
+                  Start Guide
+                </button>
+              </div>
+            </div>
+          </div>
+
           {/* ── DANGER ZONE (RESET DATA) ────────────── */}
-          <div style={{ marginTop: 'var(--space-4)', marginBottom: 'var(--space-8)' }}>
+          <div style={{ marginTop: 'var(--space-3)', marginBottom: 'var(--space-8)' }}>
             <div className="card" style={{ padding: 'var(--space-4) var(--space-5)', border: '1px solid var(--priority-critical-border)', background: 'var(--priority-critical-bg)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>

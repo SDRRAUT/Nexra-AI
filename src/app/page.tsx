@@ -95,7 +95,7 @@ export default function HomePage() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [briefing, setBriefing] = useState<BriefingData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [showOnboarding, setShowOnboarding] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null)
   const [taskFilter, setTaskFilter] = useState<'all' | 'pending' | 'completed'>('all')
   const [showAddSheet, setShowAddSheet] = useState(false)
   const [newTask, setNewTask] = useState({ title: '', priority: 'medium', category: 'personal', estimatedMinutes: 30 })
@@ -115,7 +115,7 @@ export default function HomePage() {
         const todayTasks: Task[] = localData.todayTasks as any
         const nextTask = todayTasks.find(t => t.status !== 'completed') || null
         setData({
-          user: { name: localData.user.name || 'Sanket', timezone: localData.user.timezone || 'Asia/Kolkata' },
+          user: { name: localData.user.name || 'Friend', timezone: localData.user.timezone || 'Asia/Kolkata' },
           today: {
             date: new Date().toISOString(),
             tasks: todayTasks,
@@ -135,7 +135,7 @@ export default function HomePage() {
           unreadCount: 0,
         })
         setBriefing({
-          userName: localData.user.name || 'Sanket',
+          userName: localData.user.name || 'Friend',
           isEvening: new Date().getHours() >= 17,
           briefingTitle: localData.briefing.greeting,
           briefingText: localData.briefing.summary,
@@ -165,9 +165,18 @@ export default function HomePage() {
   }
 
   useEffect(() => {
-    if (typeof localStorage !== 'undefined' && localStorage.getItem('srushti_onboarding_done') !== 'true') {
+    const isDone =
+      typeof localStorage !== 'undefined' &&
+      (localStorage.getItem('nexra_onboarding_done') === 'true' ||
+        localStorage.getItem('srushti_onboarding_done') === 'true')
+
+    if (!isDone) {
       setShowOnboarding(true)
+      setLoading(false)
+      return
     }
+
+    setShowOnboarding(false)
 
     // Schedule 8:00 AM daily briefing
     scheduleDailyMorningBriefing(8, 0)
@@ -387,6 +396,41 @@ export default function HomePage() {
           >
             ×
           </button>
+        </div>
+      </div>
+    )
+  }
+
+  // ── ONBOARDING GATING (NEW INSTALLS START HERE DIRECTLY) ──
+  if (showOnboarding === true) {
+    return (
+      <OnboardingWizard
+        onCompleted={() => {
+          setShowOnboarding(false)
+          setLoading(true)
+          scheduleDailyMorningBriefing(8, 0)
+          requestNotificationPermission()
+          fetchDashboard()
+        }}
+      />
+    )
+  }
+
+  if (showOnboarding === null) {
+    return (
+      <div
+        style={{
+          minHeight: '100dvh',
+          background: '#0F172A',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#FFFFFF',
+        }}
+      >
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '38px', marginBottom: '12px', animation: 'pulse 1.5s infinite' }}>⚡</div>
+          <div style={{ fontSize: '15px', fontWeight: 700, color: '#94A3B8', letterSpacing: '0.5px' }}>Nexra</div>
         </div>
       </div>
     )
@@ -992,15 +1036,6 @@ export default function HomePage() {
             </div>
           </div>
         </>
-      )}
-
-      {showOnboarding && (
-        <OnboardingWizard
-          onCompleted={() => {
-            setShowOnboarding(false)
-            fetchDashboard()
-          }}
-        />
       )}
 
       {/* ── NEXT-GEN FEATURE MODALS ── */}

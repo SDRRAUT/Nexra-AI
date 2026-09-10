@@ -43,9 +43,19 @@ const ChatIcon = () => (
   </svg>
 )
 
+import { useState, useEffect } from 'react'
+import { isOnboardingCompleted } from '@/lib/data/clientData'
+
 export default function BottomNav() {
   const pathname = usePathname()
   const router = useRouter()
+  const [mounted, setMounted] = useState(false)
+  const [onboarded, setOnboarded] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+    setOnboarded(isOnboardingCompleted())
+  }, [])
 
   const navItems: NavItem[] = [
     { id: 'home', label: 'Home', path: '/', icon: <HomeIcon /> },
@@ -57,6 +67,10 @@ export default function BottomNav() {
   const isActive = (path: string) => {
     if (path === '/') return pathname === '/'
     return pathname.startsWith(path)
+  }
+
+  if (!mounted || !onboarded) {
+    return null
   }
 
   return (

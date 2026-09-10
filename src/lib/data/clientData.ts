@@ -23,6 +23,14 @@ export interface DashboardData {
   }
 }
 
+export function isOnboardingCompleted(): boolean {
+  if (typeof window === 'undefined') return false
+  return (
+    localStorage.getItem('nexra_onboarding_done') === 'true' ||
+    localStorage.getItem('srushti_onboarding_done') === 'true'
+  )
+}
+
 // ── 1. DASHBOARD DATA ─────────────────────────────────────────
 export async function getClientDashboard(): Promise<DashboardData> {
   await ensureInitialData()
@@ -37,12 +45,12 @@ export async function getClientDashboard(): Promise<DashboardData> {
 
   let customName = ''
   if (typeof localStorage !== 'undefined') {
-    customName = localStorage.getItem('srushti_user_name') || ''
+    customName = localStorage.getItem('nexra_user_name') || localStorage.getItem('srushti_user_name') || ''
   }
 
   const user = userList[0] || {
     id: 'default-user',
-    name: customName || 'Sanket',
+    name: customName || 'Friend',
     timezone: 'Asia/Kolkata',
     aiAutonomy: 'autonomous',
   }

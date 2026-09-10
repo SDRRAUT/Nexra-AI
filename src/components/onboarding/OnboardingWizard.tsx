@@ -34,7 +34,7 @@ export default function OnboardingWizard({ onCompleted }: OnboardingWizardProps)
 
   const [answers, setAnswers] = useState<OnboardingAnswers>({
     name: '',
-    assistantName: '',
+    assistantName: 'Nexra',
     role: 'Student',
     mainGoals: '',
     dailyRoutine: {
@@ -592,7 +592,7 @@ export default function OnboardingWizard({ onCompleted }: OnboardingWizardProps)
                             setAnswers({ ...answers, name: e.target.value })
                             if (validationError) setValidationError(null)
                           }}
-                          placeholder="e.g. Sanket"
+                          placeholder="e.g. Your Name"
                           style={{
                             width: '100%',
                             height: 38,
@@ -622,7 +622,7 @@ export default function OnboardingWizard({ onCompleted }: OnboardingWizardProps)
 
                       <div>
                         <label style={{ fontSize: '10px', fontWeight: 700, color: '#475569', display: 'block', marginBottom: 3 }}>
-                          AI Name <span style={{ fontWeight: 400, color: '#94A3B8' }}>(Jarvis)</span>
+                          AI Name <span style={{ fontWeight: 400, color: '#94A3B8' }}>(Nexra)</span>
                         </label>
                         <input
                           type="text"
@@ -631,7 +631,7 @@ export default function OnboardingWizard({ onCompleted }: OnboardingWizardProps)
                             setAnswers({ ...answers, assistantName: e.target.value })
                             if (validationError) setValidationError(null)
                           }}
-                          placeholder="e.g. Maya, Jarvis"
+                          placeholder="e.g. Nexra, Maya"
                           style={{
                             width: '100%',
                             height: 38,

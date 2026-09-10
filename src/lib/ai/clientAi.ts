@@ -445,11 +445,15 @@ export async function generateInitialPlanFromOnboarding(data: OnboardingAnswers)
   })
 
   if (typeof localStorage !== 'undefined') {
+    localStorage.setItem('nexra_user_name', userName)
     localStorage.setItem('srushti_user_name', userName)
+    localStorage.setItem('nexra_assistant_name', assistantName)
     localStorage.setItem('srushti_assistant_name', assistantName)
     await localDb.preferences.put({ key: 'assistant_name', value: assistantName }).catch(() => {})
+    localStorage.setItem('nexra_onboarding_done', 'true')
     localStorage.setItem('srushti_onboarding_done', 'true')
     if (data.apiKey) {
+      localStorage.setItem('nexra_gemini_api_key', data.apiKey.trim())
       localStorage.setItem('srushti_gemini_api_key', data.apiKey.trim())
       await localDb.preferences.put({ key: 'gemini_api_key', value: data.apiKey.trim() })
     }
