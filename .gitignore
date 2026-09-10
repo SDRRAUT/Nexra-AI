@@ -1,6 +1,35 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# ==========================================================
+# Nexra — Production-Grade Security & Public Repository .gitignore
+# ==========================================================
 
-# dependencies
+# 1. Environment & Secrets (Crucial for Public Repo)
+.env*
+!.env.example
+*.pem
+*.key
+*.pub
+*.cert
+*.crt
+*.pfx
+*.p12
+*.jks
+*.keystore
+service-account*.json
+credentials.json
+client_secret*.json
+google-services.json
+
+# 2. Local Database & Storage Files
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+prisma/*.db
+prisma/*.db-journal
+prisma/*.sqlite
+
+# 3. Dependencies
 /node_modules
 /.pnp
 .pnp.*
@@ -10,47 +39,55 @@
 !.yarn/releases
 !.yarn/versions
 
-# testing
-/coverage
-
-# next.js
+# 4. Next.js, Turbopack & Web Builds
 /.next/
 /out/
-
-# production
 /build
+/dist
+.vercel
+*.tsbuildinfo
+next-env.d.ts
 
-# misc
+# 5. Android & Mobile Builds, SDK Configs & Signing Keys
+android/local.properties
+android/.gradle/
+android/build/
+android/app/build/
+android/captures/
+android/app/google-services.json
+android/app/*.jks
+android/app/*.keystore
+android/app/release/
+*.apk
+*.aab
+*.dex
+*.class
+bin/
+gen/
+
+# 6. IDEs, Editors & Workspaces
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~
+*.bak
+
+# 7. OS Metadata & Cache
 .DS_Store
-*.pem
+Thumbs.db
+Desktop.ini
+ehthumbs.db
 
-# debug
+# 8. Testing & Logs
+/coverage
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-# IDE & Editor files
-.idea/
-.vscode/
-*.iml
-
-# Local database files
-*.db
-*.db-journal
-
-# Internal docs, prompts & planning markdown files (keep only README.md and AGENTS.md)
+# 9. Non-public internal prompt & planning docs (Keep only public README & AGENTS)
 *.md
 !README.md
 !AGENTS.md
-

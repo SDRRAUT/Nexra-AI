@@ -2,8 +2,7 @@
 
 import { localDb } from '@/lib/db/localDb'
 
-const DEFAULT_GEMINI_KEY =
-  process.env.NEXT_PUBLIC_GEMINI_API_KEY || 'AIzaSyDNGuHpusNz7fgyOAOeLk45T3f4CjL0iaQ'
+const DEFAULT_GEMINI_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || ''
 
 async function getGeminiApiKey(): Promise<string> {
   try {
