@@ -208,6 +208,25 @@ export default function FileViewerModal({
             </div>
           )}
 
+          {/* File Notes / Summary */}
+          {doc.notes && (
+            <div
+              style={{
+                padding: 'var(--space-3) var(--space-4)',
+                background: 'var(--bg-subtle)',
+                borderRadius: 'var(--radius-md)',
+                fontSize: 'var(--text-xs)',
+                color: 'var(--text-secondary)',
+                lineHeight: 1.5,
+                marginBottom: 'var(--space-4)',
+                borderLeft: '3px solid var(--brand-primary)',
+              }}
+            >
+              <strong style={{ color: 'var(--text-primary)', display: 'block', marginBottom: 2 }}>Summary / Notes:</strong>
+              {doc.notes}
+            </div>
+          )}
+
           {/* Image Display */}
           {isImage && doc.dataUrl && (
             <div style={{ textAlign: 'center', background: 'var(--bg-base)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
@@ -324,18 +343,16 @@ export default function FileViewerModal({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-            {(doc.type === 'note' || doc.type === 'code') && (
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={() => {
-                  onClose()
-                  onEdit(doc)
-                }}
-              >
-                ✏️ Edit
-              </button>
-            )}
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => {
+                onClose()
+                onEdit(doc)
+              }}
+            >
+              ✏️ Edit Info
+            </button>
 
             <button
               type="button"
