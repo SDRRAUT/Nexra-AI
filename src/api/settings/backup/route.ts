@@ -43,7 +43,7 @@ export async function GET() {
     ])
 
     const backupData = {
-      app: 'Srushti AI',
+      app: 'Nexra',
       version: '2.0',
       exportedAt: new Date().toISOString(),
       user: {

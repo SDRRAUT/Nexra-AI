@@ -94,7 +94,7 @@ const QUICK_ACTIONS = [
 ]
 
 const WORKING_STATUSES = [
-  "Srushti is analyzing your schedule & commitments...",
+  "Nexra is analyzing your schedule & commitments...",
   "Checking deadlines and upcoming focus blocks...",
   "Formulating your personalized plan...",
   "Executing assistant actions and drafting response...",
@@ -203,7 +203,7 @@ export default function ChatPage() {
   const [showQuickActions, setShowQuickActions] = useState(true)
   const [liveLatency, setLiveLatency] = useState<number | null>(null)
   const [executingTool, setExecutingTool] = useState<{ name: string; detail: string; elapsed: number } | null>(null)
-  const [assistantName, setAssistantName] = useState('Srushti')
+  const [assistantName, setAssistantName] = useState('Nexra')
   const [userName, setUserName] = useState('Friend')
   const [userAvatar, setUserAvatar] = useState('')
   const [isListening, setIsListening] = useState(false)
@@ -272,7 +272,11 @@ export default function ChatPage() {
   const loadChatData = async (targetConvId?: string) => {
     setIsFetchingHistory(true)
     try {
-      const name = localStorage.getItem('srushti_assistant_name') || 'Srushti'
+      let name = localStorage.getItem('srushti_assistant_name') || 'Nexra'
+      if (name === 'Srushti' || name === 'Spark' || name === 'Personal Assistant') {
+        name = 'Nexra'
+        localStorage.setItem('srushti_assistant_name', 'Nexra')
+      }
       setAssistantName(name)
       const uName = localStorage.getItem('srushti_user_name') || 'Friend'
       setUserName(uName)
@@ -315,7 +319,10 @@ export default function ChatPage() {
     loadChatData()
 
     const handleDataChanged = () => {
-      const name = localStorage.getItem('srushti_assistant_name') || 'Srushti'
+      let name = localStorage.getItem('srushti_assistant_name') || 'Nexra'
+      if (name === 'Srushti' || name === 'Spark' || name === 'Personal Assistant') {
+        name = 'Nexra'
+      }
       setAssistantName(name)
       const uName = localStorage.getItem('srushti_user_name') || 'Friend'
       setUserName(uName)

@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
         data: {
           userId: DEFAULT_USER_ID,
           title: `🎯 Focus Mode Active: ${task.title}`,
-          body: `Srushti blocked out time for the next ${task.estimatedMinutes || 60} mins. Stay focused!`,
+          body: `Nexra blocked out time for the next ${task.estimatedMinutes || 60} mins. Stay focused!`,
           type: 'reminder',
           status: 'unread',
         },

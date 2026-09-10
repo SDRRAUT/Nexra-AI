@@ -75,7 +75,7 @@ export default function BottomNav() {
         </button>
       ))}
 
-      {/* Center FAB — Chat with Srushti */}
+      {/* Center FAB — Chat with Nexra */}
       <div className="bottom-nav-center">
         <button
           className="bottom-nav-fab"

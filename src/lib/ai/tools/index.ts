@@ -19,7 +19,7 @@ export const createTaskTool = tool({
     estimatedMinutes: z.number().optional().describe('How long this task will take in minutes'),
     goalId: z.string().optional().describe('ID of the goal this task belongs to'),
     isAiGenerated: z.boolean().default(true),
-    aiReason: z.string().optional().describe('Why Srushti is creating this task'),
+    aiReason: z.string().optional().describe('Why Nexra is creating this task'),
   }),
   execute: async (params: {
     title: string

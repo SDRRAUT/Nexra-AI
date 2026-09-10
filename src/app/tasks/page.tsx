@@ -204,10 +204,10 @@ export default function TasksPage() {
             <div className="empty-state">
               <div className="empty-icon">📋</div>
               <div className="empty-title">No tasks</div>
-              <div className="empty-sub">Add a task manually or tell Srushti what you're working on.</div>
+              <div className="empty-sub">Add a task manually or tell Nexra what you're working on.</div>
               <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
                 <button className="btn btn-secondary" onClick={() => setShowAddSheet(true)}>Add task</button>
-                <button className="btn btn-primary" onClick={() => router.push('/chat')}>Ask Srushti</button>
+                <button className="btn btn-primary" onClick={() => router.push('/chat')}>Ask Nexra</button>
               </div>
             </div>
           )}
@@ -386,7 +386,7 @@ export default function TasksPage() {
                 Add Task
               </button>
               <button className="btn btn-ghost btn-full" onClick={() => { setShowAddSheet(false); router.push('/chat') }}>
-                Or tell Srushti instead
+                Or tell Nexra instead
               </button>
             </div>
           </div>

@@ -34,7 +34,7 @@ export default function SettingsPage() {
 
   const [settings, setSettings] = useState<Settings>({
     name: 'Sanket',
-    assistantName: 'Srushti',
+    assistantName: 'Nexra',
     timezone: 'Asia/Kolkata',
     aiAutonomy: 'autonomous',
     notifications: true,
@@ -96,15 +96,15 @@ export default function SettingsPage() {
       }
 
       let savedAssistantName = typeof localStorage !== 'undefined' ? localStorage.getItem('srushti_assistant_name') : ''
-      if (!savedAssistantName) {
+      if (!savedAssistantName || savedAssistantName === 'Srushti' || savedAssistantName === 'Spark' || savedAssistantName === 'Personal Assistant') {
         const pref = await localDb.preferences.get('assistant_name').catch(() => null)
-        savedAssistantName = pref?.value || 'Srushti'
+        savedAssistantName = pref?.value && pref.value !== 'Srushti' && pref.value !== 'Spark' ? pref.value : 'Nexra'
       }
 
       setSettings(prev => ({
         ...prev,
         name: savedName || 'Sanket',
-        assistantName: savedAssistantName || 'Srushti',
+        assistantName: savedAssistantName || 'Nexra',
         timezone: savedTz || 'Asia/Kolkata',
       }))
     }).catch(() => {})
@@ -125,11 +125,11 @@ export default function SettingsPage() {
         accountabilityCheck: settings.accountabilityCheck,
       }).catch(() => {})
 
-      await localDb.preferences.put({ key: 'assistant_name', value: settings.assistantName || 'Srushti' }).catch(() => {})
+      await localDb.preferences.put({ key: 'assistant_name', value: settings.assistantName || 'Nexra' }).catch(() => {})
 
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem('srushti_user_name', settings.name || 'Sanket')
-        localStorage.setItem('srushti_assistant_name', settings.assistantName || 'Srushti')
+        localStorage.setItem('srushti_assistant_name', settings.assistantName || 'Nexra')
         localStorage.setItem('srushti_user_timezone', settings.timezone || 'Asia/Kolkata')
       }
 
@@ -636,7 +636,7 @@ export default function SettingsPage() {
                   className="input"
                   value={settings.assistantName}
                   onChange={e => setSettings(p => ({ ...p, assistantName: e.target.value }))}
-                  placeholder="e.g. Srushti, Jarvis, Friday..."
+                  placeholder="e.g. Nexra, Jarvis, Friday..."
                 />
               </div>
 

@@ -126,7 +126,8 @@ export async function scheduleCustomReminder(options: {
   taskId?: string
 }) {
   const numericId = Math.floor(Math.random() * 900000) + 100000
-  const assistantName = (typeof localStorage !== 'undefined' ? localStorage.getItem('srushti_assistant_name') : 'Personal Assistant') || 'Personal Assistant'
+  const rawAssistantName = typeof localStorage !== 'undefined' ? localStorage.getItem('srushti_assistant_name') : 'Nexra'
+  const assistantName = (!rawAssistantName || rawAssistantName === 'Srushti' || rawAssistantName === 'Spark' || rawAssistantName === 'Personal Assistant') ? 'Nexra' : rawAssistantName
   const body = options.body || `${assistantName} reminder: ${options.title}`
 
   // 1. Save to local IndexedDB notifications
@@ -173,7 +174,8 @@ export async function scheduleDailyMorningBriefing(hour = 8, minute = 0) {
       scheduledDate.setDate(scheduledDate.getDate() + 1)
     }
 
-    const assistantName = (typeof localStorage !== 'undefined' ? localStorage.getItem('srushti_assistant_name') : 'Personal Assistant') || 'Personal Assistant'
+    const rawAssistantName = typeof localStorage !== 'undefined' ? localStorage.getItem('srushti_assistant_name') : 'Nexra'
+    const assistantName = (!rawAssistantName || rawAssistantName === 'Srushti' || rawAssistantName === 'Spark' || rawAssistantName === 'Personal Assistant') ? 'Nexra' : rawAssistantName
     const userName = (typeof localStorage !== 'undefined' ? localStorage.getItem('srushti_user_name') : 'You') || 'You'
 
     await LocalNotifications.schedule({

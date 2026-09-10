@@ -50,7 +50,7 @@ const SECTIONS = [
       {
         icon: '🧠',
         title: 'Memory Vault',
-        desc: 'What Srushti remembers & learned about you',
+        desc: 'What Nexra remembers & learned about you',
         path: '/memory',
         gradient: 'linear-gradient(135deg, #EC4899, #DB2777)',
         badge: 'Brain',
@@ -211,7 +211,7 @@ export default function MorePage() {
                   />
                 </div>
                 <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginTop: 2 }}>
-                  Srushti Life Engine · {userData.timezone}
+                  Nexra Life Engine · {userData.timezone}
                 </div>
               </div>
 
@@ -281,7 +281,7 @@ export default function MorePage() {
                   AI Personal Assistant
                 </div>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 800 }}>
-                  Talk with Srushti
+                  Talk with Nexra
                 </div>
                 <div style={{ fontSize: 'var(--text-xs)', opacity: 0.85, marginTop: 4 }}>
                   Ask questions, adapt schedules & get deep life advice
@@ -472,10 +472,10 @@ export default function MorePage() {
           {/* ── FOOTER BRANDING ─────────────────────────── */}
           <div style={{ textAlign: 'center', padding: 'var(--space-6) 0 var(--space-8)' }}>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-base)', fontWeight: 800, color: 'var(--brand-primary)' }}>
-              Srushti
+              Nexra
             </div>
             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginTop: 2 }}>
-              Engineered with precision by Team SDR
+              The next layer of your life. · Engineered with precision by Team SDR
             </div>
           </div>
 

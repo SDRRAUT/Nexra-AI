@@ -111,9 +111,9 @@ export default function MemoryPage() {
         <div className="page-section" style={{ marginTop: 'var(--space-4)' }}>
 
           <div style={{ background: 'linear-gradient(135deg, rgba(236,72,153,0.08), rgba(139,92,246,0.08))', border: '1px solid rgba(236,72,153,0.15)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-4)', marginBottom: 'var(--space-5)' }}>
-            <div style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--text-primary)' }}>🧠 What Srushti remembers</div>
+            <div style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--text-primary)' }}>🧠 What Nexra remembers</div>
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginTop: 4 }}>
-              Srushti uses these memories to understand your context and give better answers. You can edit or delete any memory at any time.
+              Nexra uses these memories to understand your context and give better answers. You can edit or delete any memory at any time.
             </div>
           </div>
 
@@ -140,8 +140,8 @@ export default function MemoryPage() {
             <div className="empty-state">
               <div className="empty-icon">🧠</div>
               <div className="empty-title">No memories yet</div>
-              <div className="empty-sub">Tell Srushti important things about your life and she'll remember them.</div>
-              <button className="btn btn-primary" style={{ marginTop: 'var(--space-4)' }} onClick={() => router.push('/chat')}>Talk to Srushti</button>
+              <div className="empty-sub">Tell Nexra important things about your life and Nexra will remember them.</div>
+              <button className="btn btn-primary" style={{ marginTop: 'var(--space-4)' }} onClick={() => router.push('/chat')}>Talk to Nexra</button>
             </div>
           )}
 
@@ -276,7 +276,7 @@ export default function MemoryPage() {
             <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 700, marginBottom: 'var(--space-5)' }}>Add Memory</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
               <div className="input-group">
-                <label className="input-label">What should Srushti remember?</label>
+                <label className="input-label">What should Nexra remember?</label>
                 <textarea className="input" rows={3} placeholder="e.g. I prefer studying in 25-minute intervals..." value={newMemory.content} onChange={e => setNewMemory(p => ({ ...p, content: e.target.value }))} style={{ resize: 'none' }} />
               </div>
               <div className="input-group">

@@ -125,7 +125,7 @@ export default function AgentsPage() {
 
   return (
     <div className="app-shell">
-      <AppHeader title="Agent Activity" subtitle="What Srushti has been doing" showBrand={false} showBack />
+      <AppHeader title="Agent Activity" subtitle="What Nexra has been doing" showBrand={false} showBack />
 
       <div className="page-content">
         <div className="page-section" style={{ marginTop: 'var(--space-4)' }}>
@@ -153,8 +153,8 @@ export default function AgentsPage() {
             <div className="empty-state">
               <div className="empty-icon">🤖</div>
               <div className="empty-title">No agent activity yet</div>
-              <div className="empty-sub">Srushti's activity log will appear here when she takes actions on your behalf.</div>
-              <button className="btn btn-primary" style={{ marginTop: 'var(--space-4)' }} onClick={() => router.push('/chat')}>Talk to Srushti</button>
+              <div className="empty-sub">Nexra's activity log will appear here when actions are taken on your behalf.</div>
+              <button className="btn btn-primary" style={{ marginTop: 'var(--space-4)' }} onClick={() => router.push('/chat')}>Talk to Nexra</button>
             </div>
           )}
 

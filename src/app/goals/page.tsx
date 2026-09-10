@@ -258,14 +258,14 @@ export default function GoalsPage() {
                 <div className="empty-icon">🎯</div>
                 <div className="empty-title">No goals set yet</div>
                 <div className="empty-sub">
-                  Set ambitious goals and Srushti will help you break them into bite-sized daily tasks.
+                  Set ambitious goals and Nexra will help you break them into bite-sized daily tasks.
                 </div>
                 <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
                   <button className="btn btn-primary btn-sm" onClick={() => setShowAdd(true)}>
                     + Create Goal
                   </button>
                   <button className="btn btn-secondary btn-sm" onClick={() => router.push('/chat')}>
-                    Discuss with Srushti
+                    Discuss with Nexra
                   </button>
                 </div>
               </div>
@@ -471,7 +471,7 @@ export default function GoalsPage() {
                         onClick={() => router.push('/chat')}
                         style={{ fontSize: '11px', color: 'var(--brand-primary)' }}
                       >
-                        Plan subtasks with Srushti →
+                        Plan subtasks with Nexra →
                       </button>
                     </div>
                   </div>

@@ -229,7 +229,7 @@ export default function ExamDeconstructionWizard({
                 {examName} · {daysRemaining} Days Plan
               </div>
               <p className="exam-plan-p">
-                Srushti will allocate <strong>{parsedChapters.length} study blocks</strong> spaced evenly before your exam, plus a dedicated <strong>Mock Test & Formula Review Day</strong>.
+                Nexra will allocate <strong>{parsedChapters.length} study blocks</strong> spaced evenly before your exam, plus a dedicated <strong>Mock Test & Formula Review Day</strong>.
               </p>
 
               <div className="exam-plan-breakdown">

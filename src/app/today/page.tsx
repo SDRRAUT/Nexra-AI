@@ -237,7 +237,7 @@ export default function TodayPage() {
           </div>
         )}
 
-        {/* Ask Srushti floating prompt */}
+        {/* Ask Nexra floating prompt */}
         <div className="page-section">
           <div style={{
             background: 'linear-gradient(135deg, rgba(91,107,240,0.06), rgba(139,92,246,0.06))',
