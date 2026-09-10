@@ -308,74 +308,163 @@ export default function MorePage() {
                 {section.title}
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                {section.items.map(item => (
-                  <div
-                    key={item.path}
-                    className="card fade-in-up"
-                    onClick={() => router.push(item.path)}
-                    style={{
-                      cursor: 'pointer',
-                      transition: 'all var(--transition-fast)',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', padding: 'var(--space-4) var(--space-4)' }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(2, 1fr)',
+                  gap: '10px',
+                }}
+              >
+                {section.items.map((item, idx) => {
+                  const isWide = section.items.length % 2 === 1 && idx === section.items.length - 1
+
+                  if (isWide) {
+                    return (
                       <div
+                        key={item.path}
+                        className="card fade-in-up"
+                        onClick={() => router.push(item.path)}
                         style={{
-                          width: 44,
-                          height: 44,
-                          borderRadius: 'var(--radius-lg)',
-                          background: item.gradient,
+                          gridColumn: 'span 2',
+                          cursor: 'pointer',
+                          padding: '12px 14px',
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: 20,
-                          color: 'white',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                          flexShrink: 0,
+                          gap: '12px',
+                          transition: 'all var(--transition-fast)',
                         }}
                       >
-                        {item.icon}
+                        <div
+                          style={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: '11px',
+                            background: item.gradient,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 20,
+                            color: 'white',
+                            boxShadow: '0 4px 10px rgba(0,0,0,0.08)',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {item.icon}
+                        </div>
+
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--text-primary)' }}>
+                              {item.title}
+                            </div>
+                            <span
+                              style={{
+                                fontSize: '9px',
+                                fontWeight: 700,
+                                color: 'var(--text-tertiary)',
+                                background: 'var(--bg-subtle)',
+                                padding: '1px 6px',
+                                borderRadius: 'var(--radius-full)',
+                                border: '1px solid var(--border-subtle)',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.4px',
+                              }}
+                            >
+                              {item.badge}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: 2, lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {item.desc}
+                          </div>
+                        </div>
+
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="var(--text-tertiary)"
+                          strokeWidth={2.5}
+                          strokeLinecap="round"
+                        >
+                          <polyline points="9,18 15,12 9,6" />
+                        </svg>
+                      </div>
+                    )
+                  }
+
+                  return (
+                    <div
+                      key={item.path}
+                      className="card fade-in-up"
+                      onClick={() => router.push(item.path)}
+                      style={{
+                        cursor: 'pointer',
+                        padding: '14px 12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        minHeight: 114,
+                        transition: 'all var(--transition-fast)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                        <div
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: '10px',
+                            background: item.gradient,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 18,
+                            color: 'white',
+                            boxShadow: '0 4px 10px rgba(0,0,0,0.08)',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {item.icon}
+                        </div>
+                        <span
+                          style={{
+                            fontSize: '9px',
+                            fontWeight: 700,
+                            color: 'var(--text-tertiary)',
+                            background: 'var(--bg-subtle)',
+                            padding: '1px 6px',
+                            borderRadius: 'var(--radius-full)',
+                            border: '1px solid var(--border-subtle)',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.3px',
+                          }}
+                        >
+                          {item.badge}
+                        </span>
                       </div>
 
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                          <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text-primary)' }}>
-                            {item.title}
-                          </div>
-                          <span
-                            style={{
-                              fontSize: '10px',
-                              fontWeight: 700,
-                              color: 'var(--text-tertiary)',
-                              background: 'var(--bg-subtle)',
-                              padding: '1px 6px',
-                              borderRadius: 'var(--radius-full)',
-                              border: '1px solid var(--border-subtle)',
-                            }}
-                          >
-                            {item.badge}
-                          </span>
+                      <div style={{ marginTop: 10 }}>
+                        <div style={{ fontFamily: 'var(--font-display)', fontSize: '13.5px', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.25 }}>
+                          {item.title}
                         </div>
-                        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginTop: 2, lineHeight: 1.4 }}>
+                        <div
+                          style={{
+                            fontSize: '11px',
+                            color: 'var(--text-tertiary)',
+                            marginTop: 2,
+                            lineHeight: 1.3,
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                          }}
+                        >
                           {item.desc}
                         </div>
                       </div>
-
-                      <svg
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="var(--text-tertiary)"
-                        strokeWidth={2.5}
-                        strokeLinecap="round"
-                      >
-                        <polyline points="9,18 15,12 9,6" />
-                      </svg>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           ))}

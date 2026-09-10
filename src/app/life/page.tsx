@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import AppHeader from '@/components/layout/AppHeader'
 import BottomNav from '@/components/layout/BottomNav'
+import WheelOfLifeRadar from '@/components/life/WheelOfLifeRadar'
 
 export default function LifePage() {
   const router = useRouter()
@@ -28,18 +29,12 @@ export default function LifePage() {
     <div className="app-shell">
       <AppHeader title="Life Analysis" subtitle="Your big picture view" showBrand={false} showBack />
 
-      <div className="page-content">
+      <div className="page-content" style={{ paddingBottom: '95px' }}>
         <div className="page-section" style={{ marginTop: 'var(--space-4)' }}>
 
-          {/* Hero */}
-          <div className="greeting-card fade-in-up" style={{ marginBottom: 'var(--space-6)' }}>
-            <div style={{ fontSize: 48, marginBottom: 'var(--space-3)' }}>🌍</div>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-2xl)', fontWeight: 800 }}>
-              Life Analysis
-            </div>
-            <div style={{ fontSize: 'var(--text-sm)', opacity: 0.8, marginTop: 8, lineHeight: 1.6 }}>
-              Ask Srushti for a complete view of your life — goals, productivity, risks, and what needs your attention.
-            </div>
+          {/* Wheel of Life Interactive Radar */}
+          <div style={{ marginBottom: 'var(--space-6)' }}>
+            <WheelOfLifeRadar />
           </div>
 
           {/* Prompt cards */}

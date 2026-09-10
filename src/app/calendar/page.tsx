@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import AppHeader from '@/components/layout/AppHeader'
 import BottomNav from '@/components/layout/BottomNav'
 import {
   format,
@@ -31,6 +30,7 @@ import {
   toggleClientHabit,
 } from '@/lib/data/clientData'
 import type { LocalHabitLog } from '@/lib/db/localDb'
+import ScheduleOptimizerModal from '@/components/calendar/ScheduleOptimizerModal'
 
 interface Task {
   id: string
@@ -104,6 +104,144 @@ const priorityColors: Record<string, string> = {
   low: 'var(--priority-low, #10B981)',
 }
 
+const CalendarIconSvg = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+    <line x1="16" y1="2" x2="16" y2="6" />
+    <line x1="8" y1="2" x2="8" y2="6" />
+    <line x1="3" y1="10" x2="21" y2="10" />
+  </svg>
+)
+
+const ClockIconSvg = ({ color = 'currentColor' }: { color?: string }) => (
+  <svg
+    width="13"
+    height="13"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth={2.4}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    style={{ display: 'inline-block', verticalAlign: '-1px', marginRight: 5, flexShrink: 0 }}
+  >
+    <circle cx="12" cy="12" r="10" />
+    <polyline points="12 6 12 12 16 14" />
+  </svg>
+)
+
+/* Head profile with brain illustration (Deep work) */
+const HeadBrainGraphic = () => (
+  <svg width="48" height="48" viewBox="0 0 64 64" fill="none">
+    {/* Head Outline */}
+    <path
+      d="M32 10C21 10 14 17 14 26C14 32.5 17.5 37 20 40V52C20 54.2 21.8 56 24 56H38C40.2 56 42 54.2 42 52V47H44C46.2 47 48 45.2 48 43V38.5C51.5 38.5 54 35.8 54 32.5C54 30.2 52.8 28.2 51 27.2V24C51 15 42.5 10 32 10Z"
+      stroke="#0284C7"
+      strokeWidth="3.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    {/* Brain Convolutions inside */}
+    <path
+      d="M28 20C25 20 22 22 22 25C22 27.5 24 29 26.5 29.5C28.5 30 30 32 30 34"
+      stroke="#0284C7"
+      strokeWidth="2.8"
+      strokeLinecap="round"
+    />
+    <path
+      d="M35 18C39 18 42 20.5 42 24C42 26.5 40.5 28 38.5 29C36 30 36 32.5 37.5 34"
+      stroke="#0284C7"
+      strokeWidth="2.8"
+      strokeLinecap="round"
+    />
+    <path
+      d="M29 25C31 25 33 27 33 29"
+      stroke="#0284C7"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+    />
+  </svg>
+)
+
+/* Dog silhouette illustration (Walk the dog) */
+const DogGraphic = () => (
+  <svg width="50" height="42" viewBox="0 0 100 84" fill="#F97316">
+    {/* Tail */}
+    <path d="M12 36 C 8 26, 16 14, 26 18 C 22 24, 20 30, 22 38 Z" />
+    {/* Back & Torso */}
+    <path d="M22 38 C 26 34, 38 34, 52 35 C 58 35, 62 30, 68 22 C 72 16, 78 16, 82 22 C 84 25, 88 28, 92 28 C 95 28, 96 32, 94 35 C 91 38, 86 40, 82 42 C 80 48, 76 52, 70 54 C 64 56, 55 56, 44 56 C 34 56, 26 52, 22 46 Z" />
+    {/* Back Legs */}
+    <path d="M22 46 C 24 54, 24 64, 22 74 C 21 77, 26 78, 29 78 C 31 78, 32 75, 31 71 C 33 63, 35 55, 37 49 Z" />
+    <path d="M32 48 C 34 56, 36 64, 34 72 C 34 75, 38 76, 41 76 C 43 76, 43 73, 42 70 C 42 62, 41 55, 40 49 Z" opacity="0.85" />
+    {/* Front Legs */}
+    <path d="M62 52 C 63 60, 63 68, 62 76 C 62 79, 67 80, 70 80 C 72 80, 72 77, 71 73 C 71 65, 70 58, 68 52 Z" />
+    <path d="M72 50 C 74 58, 75 66, 74 74 C 74 77, 78 78, 81 78 C 83 78, 83 75, 82 72 C 81 64, 79 57, 77 50 Z" opacity="0.85" />
+    {/* Ear */}
+    <path d="M72 20 C 70 24, 71 30, 74 34 C 76 34, 77 31, 76 26 Z" fill="#EA580C" />
+  </svg>
+)
+
+/* Web Conference group illustration */
+const ConferenceGraphic = () => (
+  <svg width="50" height="42" viewBox="0 0 64 48" fill="#2563EB">
+    {/* Center figure */}
+    <circle cx="32" cy="14" r="7" />
+    <path d="M19 40c0-7 5.8-12 13-12s13 5 13 12v2H19v-2z" />
+    {/* Left figure */}
+    <circle cx="14" cy="18" r="5.5" opacity="0.9" />
+    <path d="M4 39c0-5.5 4.5-9.5 10-9.5 2 0 3.8.5 5.2 1.5-1.2 2-2 4.4-2 7.5v2.5H4V39z" opacity="0.9" />
+    {/* Right figure */}
+    <circle cx="50" cy="18" r="5.5" opacity="0.9" />
+    <path d="M60 39c0-5.5-4.5-9.5-10-9.5-2 0-3.8.5-5.2 1.5 1.2 2 2 4.4 2 7.5v2.5h13.2V39z" opacity="0.9" />
+  </svg>
+)
+
+/* Stretching runner/athlete illustration */
+const StretchingGraphic = () => (
+  <svg width="48" height="44" viewBox="0 0 60 52" fill="#F43F5E">
+    {/* Head */}
+    <circle cx="43" cy="11" r="5" />
+    {/* Body & Front Bent Leg in lunge stretch */}
+    <path d="M38 18c-2 1-4.2 1.5-6.5 1.5-4 0-7.2-1.5-9.8-4l-3.5 3.5c3.3 3.3 7.8 5.5 13.3 5.5 2.2 0 4.5-.4 6.5-1.2l-2.5 8.2-15 2c-1.4.2-2.5 1.4-2.4 2.8.2 1.4 1.4 2.5 2.8 2.4l17-2.2 4 11c.5 1.3 1.9 2 3.2 1.5 1.3-.5 2-1.9 1.5-3.2l-5-13.8 4.8-16c.4-1.4-.4-2.8-1.9-3.3l-6.5-2z" />
+    {/* Back Leg Extended in Lunge */}
+    <path d="M21 24l-11 9.5c-1 .9-1.1 2.4-.2 3.4.9 1 2.4 1.1 3.4.2l10-8.8-2.2-4.3z" />
+  </svg>
+)
+
+const MonthViewIconSvg = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+    <line x1="16" y1="2" x2="16" y2="6" />
+    <line x1="8" y1="2" x2="8" y2="6" />
+    <line x1="3" y1="10" x2="21" y2="10" />
+  </svg>
+)
+
+const WeekViewIconSvg = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="3" />
+    <line x1="9" y1="3" x2="9" y2="21" />
+    <line x1="15" y1="3" x2="15" y2="21" />
+  </svg>
+)
+
+const PlusIconSvg = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="5" x2="12" y2="19" />
+    <line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+)
+
+const CalendarEmptySvg = () => (
+  <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+    <line x1="16" y1="2" x2="16" y2="6" />
+    <line x1="8" y1="2" x2="8" y2="6" />
+    <line x1="3" y1="10" x2="21" y2="10" />
+    <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" strokeWidth={2.6} strokeLinecap="round" />
+  </svg>
+)
+
 export default function CalendarPage() {
   const router = useRouter()
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -117,6 +255,7 @@ export default function CalendarPage() {
   const [calendarMode, setCalendarMode] = useState<'week' | 'month'>('week')
   const [showAddSheet, setShowAddSheet] = useState(false)
   const [addMode, setAddMode] = useState<'event' | 'task'>('event')
+  const [showOptimizerModal, setShowOptimizerModal] = useState(false)
 
   const [newEvent, setNewEvent] = useState({
     title: '',
@@ -171,9 +310,9 @@ export default function CalendarPage() {
   const firstDayOfWeek = startOfMonth(currentDate).getDay()
   const paddedMonthDays = [...Array(firstDayOfWeek).fill(null), ...daysInMonth]
 
-  // Week strip (current selected date's week)
-  const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 })
-  const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 0 })
+  // Week strip (current selected date's week, starts on Monday)
+  const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 })
+  const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 1 })
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd })
 
   // Smart multi-source resolver for any given day
@@ -312,537 +451,345 @@ export default function CalendarPage() {
     loadAllCalendarData()
   }
 
+  // Map real user items into modern pastel activity cards
+  const userActivities = [
+    ...selectedDayTasks.map((task, idx) => {
+      const isDone = task.status === 'completed'
+      const titleLower = task.title.toLowerCase()
+      const isDeep = titleLower.includes('deep') || titleLower.includes('focus') || titleLower.includes('study') || titleLower.includes('code')
+      const isWalk = titleLower.includes('walk') || titleLower.includes('dog') || titleLower.includes('errand') || titleLower.includes('break')
+      const isConf = titleLower.includes('meet') || titleLower.includes('conference') || titleLower.includes('call') || titleLower.includes('class')
+      const isStretch = titleLower.includes('stretch') || titleLower.includes('workout') || titleLower.includes('gym') || titleLower.includes('yoga')
+
+      let theme = 'activity-card-deepwork'
+      let graphic = <HeadBrainGraphic />
+      if (isWalk) { theme = 'activity-card-walk'; graphic = <DogGraphic /> }
+      else if (isConf) { theme = 'activity-card-conference'; graphic = <ConferenceGraphic /> }
+      else if (isStretch) { theme = 'activity-card-stretching'; graphic = <StretchingGraphic /> }
+
+      const timeStr = task.scheduledStart 
+        ? format(new Date(task.scheduledStart), 'HH:mm') + (task.estimatedMinutes ? ` · ${task.estimatedMinutes}m` : '') 
+        : task.deadline 
+        ? `Due ${format(new Date(task.deadline), 'HH:mm')}`
+        : `${task.estimatedMinutes || 30} min remaining`
+
+      const timeLabel = task.scheduledStart 
+        ? format(new Date(task.scheduledStart), 'HH:mm')
+        : task.deadline 
+        ? format(new Date(task.deadline), 'HH:mm')
+        : '08:00'
+
+      return {
+        id: task.id,
+        title: task.title,
+        subtitle: isDone ? 'Completed' : timeStr,
+        timeLabel,
+        theme,
+        graphic,
+        isNow: !isDone && idx === 0,
+        isDone,
+        subtitleClass: isDeep ? 'accent-blue' : '',
+        onToggle: () => handleToggleTask(task),
+      }
+    }),
+    ...selectedDayEvents.map((event, idx) => {
+      const titleLower = event.title.toLowerCase()
+      const isWalk = titleLower.includes('walk') || titleLower.includes('dog')
+      const isConf = titleLower.includes('conference') || titleLower.includes('meet') || event.type === 'meeting'
+      const isStretch = titleLower.includes('stretch') || titleLower.includes('gym')
+
+      let theme = 'activity-card-conference'
+      let graphic = <ConferenceGraphic />
+      if (isWalk) { theme = 'activity-card-walk'; graphic = <DogGraphic /> }
+      else if (isStretch) { theme = 'activity-card-stretching'; graphic = <StretchingGraphic /> }
+      else if (event.type === 'study') { theme = 'activity-card-deepwork'; graphic = <HeadBrainGraphic /> }
+
+      const timeStr = `${format(new Date(event.startTime), 'HH:mm')} - ${format(new Date(event.endTime), 'HH:mm')}`
+      const timeLabel = format(new Date(event.startTime), 'HH:mm')
+
+      return {
+        id: event.id,
+        title: event.title,
+        subtitle: timeStr + (event.location ? ` · 📍 ${event.location}` : ''),
+        timeLabel,
+        theme,
+        graphic,
+        isNow: idx === 0 && selectedDayTasks.length === 0,
+        isDone: false,
+        subtitleClass: '',
+        onToggle: () => handleDeleteEvent(event.id, event.title),
+      }
+    }),
+  ]
+
+  const displayedActivities = userActivities
+  const completedActivitiesCount = displayedActivities.filter(a => a.isDone).length
+  const totalActivitiesCount = displayedActivities.length
+
   return (
-    <div className="app-shell">
-      <AppHeader title="Calendar" subtitle="Schedule & Commitments" showBrand={false} showBack={false} />
+    <div className="app-shell modern-cal-page">
+      {/* ── BEAUTIFUL MODERN CALENDAR HEADER ── */}
+      <div className="modern-cal-header">
+        <h1 className="modern-cal-title">Calendar</h1>
 
-      <div className="page-content">
-        <div className="page-section" style={{ marginTop: 'var(--space-4)' }}>
-
-          {/* ── TOP HERO CALENDAR BANNER ─────────────────────────── */}
-          <div
-            className="card fade-in-up"
-            style={{
-              padding: 'var(--space-4) var(--space-5)',
-              background: 'linear-gradient(135deg, var(--bg-surface), var(--bg-subtle))',
-              border: '1px solid var(--border-default)',
-              marginBottom: 'var(--space-4)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--brand-primary)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
-                  {isToday(selectedDate) ? '• TODAY' : format(selectedDate, 'EEEE')}
-                </div>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 800, color: 'var(--text-primary)' }}>
-                  {format(selectedDate, 'MMMM d, yyyy')}
-                </div>
-                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginTop: 2 }}>
-                  {selectedDayItems.total === 0
-                    ? 'No commitments scheduled'
-                    : `${selectedDayEvents.length} events · ${selectedDayTasks.length} tasks · ${selectedDayGoals.length} goals`}
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                <button
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => {
-                    const today = new Date()
-                    setSelectedDate(today)
-                    setCurrentDate(today)
-                  }}
-                  style={{ fontSize: '11px', padding: '4px 10px' }}
-                >
-                  Today
-                </button>
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={() => setShowAddSheet(true)}
-                  style={{ fontSize: '11px', padding: '4px 10px' }}
-                >
-                  + Add
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* ── MODE & NAVIGATION SELECTOR ─────────────────────────── */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-              <button className="btn btn-secondary btn-sm" onClick={prevPeriod} style={{ width: 32, height: 32, padding: 0, fontSize: 16 }}>
-                ‹
-              </button>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text-primary)' }}>
-                {format(calendarMode === 'month' ? currentDate : selectedDate, 'MMMM yyyy')}
-              </div>
-              <button className="btn btn-secondary btn-sm" onClick={nextPeriod} style={{ width: 32, height: 32, padding: 0, fontSize: 16 }}>
-                ›
-              </button>
-            </div>
-
-            {/* Toggle Week vs Month */}
-            <div
-              style={{
-                display: 'flex',
-                background: 'var(--bg-muted)',
-                borderRadius: 'var(--radius-md)',
-                padding: 2,
+        <div className="cal-header-actions">
+          {!isToday(selectedDate) && (
+            <button
+              className="cal-today-pill-btn"
+              onClick={() => {
+                const now = new Date()
+                setSelectedDate(now)
+                setCurrentDate(now)
               }}
+              title="Jump to today"
+              id="cal-jump-today-btn"
             >
-              <button
-                onClick={() => setCalendarMode('week')}
-                style={{
-                  padding: '4px 10px',
-                  borderRadius: 'var(--radius-sm)',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  border: 'none',
-                  background: calendarMode === 'week' ? 'var(--brand-primary)' : 'transparent',
-                  color: calendarMode === 'week' ? 'white' : 'var(--text-secondary)',
-                  cursor: 'pointer',
-                }}
-              >
-                Week
-              </button>
-              <button
-                onClick={() => setCalendarMode('month')}
-                style={{
-                  padding: '4px 10px',
-                  borderRadius: 'var(--radius-sm)',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  border: 'none',
-                  background: calendarMode === 'month' ? 'var(--brand-primary)' : 'transparent',
-                  color: calendarMode === 'month' ? 'white' : 'var(--text-secondary)',
-                  cursor: 'pointer',
-                }}
-              >
-                Month
-              </button>
-            </div>
-          </div>
-
-          {/* ── WEEK VIEW HORIZONTAL STRIP ─────────────────────────── */}
-          {calendarMode === 'week' ? (
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(7, 1fr)',
-                gap: 'var(--space-1)',
-                marginBottom: 'var(--space-5)',
-              }}
-            >
-              {weekDays.map((day, idx) => {
-                const isSel = isSameDay(day, selectedDate)
-                const isTod = isToday(day)
-                const { total, dayTasks, dayEvents, dayGoals } = getItemsForDay(day)
-                return (
-                  <button
-                    key={idx}
-                    onClick={() => setSelectedDate(day)}
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      padding: '8px 2px',
-                      borderRadius: 'var(--radius-lg)',
-                      border: isSel
-                        ? '2px solid var(--brand-primary)'
-                        : isTod
-                        ? '1.5px dashed var(--brand-primary)'
-                        : '1px solid var(--border-subtle)',
-                      background: isSel
-                        ? 'linear-gradient(135deg, var(--brand-primary), var(--brand-purple))'
-                        : isTod
-                        ? 'var(--bg-subtle)'
-                        : 'var(--bg-surface)',
-                      color: isSel ? 'white' : 'var(--text-primary)',
-                      cursor: 'pointer',
-                      transition: 'all var(--transition-fast)',
-                    }}
-                  >
-                    <span style={{ fontSize: '10px', fontWeight: 600, opacity: isSel ? 0.9 : 0.6, textTransform: 'uppercase' }}>
-                      {format(day, 'EEE')}
-                    </span>
-                    <span style={{ fontFamily: 'var(--font-display)', fontSize: '15px', fontWeight: 800, margin: '2px 0' }}>
-                      {format(day, 'd')}
-                    </span>
-                    {total > 0 && (
-                      <div style={{ display: 'flex', gap: 2, marginTop: 2 }}>
-                        {dayEvents.length > 0 && (
-                          <span style={{ width: 4, height: 4, borderRadius: '50%', background: isSel ? '#93C5FD' : '#3B82F6' }} />
-                        )}
-                        {dayTasks.length > 0 && (
-                          <span style={{ width: 4, height: 4, borderRadius: '50%', background: isSel ? '#FDE68A' : '#F59E0B' }} />
-                        )}
-                        {dayGoals.length > 0 && (
-                          <span style={{ width: 4, height: 4, borderRadius: '50%', background: isSel ? '#FCA5A5' : '#EF4444' }} />
-                        )}
-                      </div>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          ) : (
-            /* ── FULL MONTH GRID VIEW ─────────────────────────── */
-            <div className="card fade-in-up" style={{ padding: 'var(--space-3)', marginBottom: 'var(--space-5)' }}>
-              <div className="calendar-grid" style={{ marginBottom: 6 }}>
-                {DAYS.map(d => (
-                  <div key={d} className="calendar-day-header" style={{ fontSize: '11px', fontWeight: 700 }}>
-                    {d}
-                  </div>
-                ))}
-              </div>
-              <div className="calendar-grid">
-                {paddedMonthDays.map((day, i) => {
-                  if (!day) return <div key={i} />
-                  const { total, dayTasks, dayEvents, dayGoals } = getItemsForDay(day)
-                  const isSel = isSameDay(day, selectedDate)
-                  const isTod = isToday(day)
-                  const isCurr = isSameMonth(day, currentDate)
-                  return (
-                    <div
-                      key={i}
-                      className={`calendar-day ${isTod ? 'today' : ''} ${isSel && !isTod ? 'selected' : ''} ${!isCurr ? 'other-month' : ''}`}
-                      onClick={() => setSelectedDate(day)}
-                      style={{ height: 44, borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
-                    >
-                      <span className="calendar-day-num" style={{ fontSize: '12px' }}>{format(day, 'd')}</span>
-                      {total > 0 && (
-                        <div style={{ display: 'flex', gap: 2, marginTop: 2 }}>
-                          {dayEvents.length > 0 && (
-                            <span style={{ width: 4, height: 4, borderRadius: '50%', background: isSel ? 'white' : '#3B82F6' }} />
-                          )}
-                          {dayTasks.length > 0 && (
-                            <span style={{ width: 4, height: 4, borderRadius: '50%', background: isSel ? 'white' : '#F59E0B' }} />
-                          )}
-                          {dayGoals.length > 0 && (
-                            <span style={{ width: 4, height: 4, borderRadius: '50%', background: isSel ? 'white' : '#EF4444' }} />
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
+              Today
+            </button>
           )}
 
-          {/* ── DAY SCHEDULE AGENDA ─────────────────────────── */}
-          <div style={{ marginBottom: 'var(--space-6)' }}>
-            <div className="section-header">
-              <div className="section-title">
-                {isToday(selectedDate) ? "Today's Schedule & Tasks" : format(selectedDate, "EEE, MMM d") + ' Schedule'}
-              </div>
-              <span
-                className="section-action"
-                onClick={() => router.push('/chat')}
-              >
-                Plan with AI ✨
-              </span>
-            </div>
+          <button
+            className={`modern-cal-toggle-btn ${calendarMode === 'month' ? 'active' : ''}`}
+            onClick={() => setCalendarMode(m => m === 'week' ? 'month' : 'week')}
+            title={calendarMode === 'week' ? 'Switch to Full Month View' : 'Switch to Week View'}
+            id="cal-toggle-mode-btn"
+          >
+            {calendarMode === 'week' ? <MonthViewIconSvg /> : <WeekViewIconSvg />}
+          </button>
 
-            {selectedDayEvents.length === 0 && selectedDayTasks.length === 0 && selectedDayGoals.length === 0 ? (
-              <div className="card fade-in-up">
-                <div style={{ padding: 'var(--space-8) var(--space-4)', textAlign: 'center' }}>
-                  <div style={{ fontSize: 36, marginBottom: 'var(--space-2)' }}>🌱</div>
-                  <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    No events or tasks scheduled
-                  </div>
-                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', maxWidth: 280, margin: '6px auto 16px' }}>
-                    Tap + Add above to schedule a task or event, or ask AI in Chat to organize your day.
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-                    <button
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => setShowAddSheet(true)}
-                    >
-                      + Add Item
-                    </button>
-                    <button
-                      className="btn btn-primary btn-sm"
-                      onClick={() => router.push('/chat')}
-                    >
-                      Auto-Plan in Chat
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-
-                {/* 1. Goal Deadlines on this day */}
-                {selectedDayGoals.map(goal => (
-                  <div
-                    key={goal.id}
-                    className="card fade-in-up"
-                    style={{
-                      borderLeft: '4px solid #EF4444',
-                      background: 'linear-gradient(90deg, rgba(239,68,68,0.08), var(--bg-surface))',
-                    }}
-                  >
-                    <div style={{ padding: 'var(--space-3) var(--space-4)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                      <div
-                        style={{
-                          width: 38,
-                          height: 38,
-                          borderRadius: 'var(--radius-md)',
-                          background: 'linear-gradient(135deg, #EF4444, #DC2626)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: 18,
-                          color: 'white',
-                          flexShrink: 0,
-                        }}
-                      >
-                        🎯
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-base)', fontWeight: 800, color: 'var(--text-primary)' }}>
-                          {goal.title}
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 2 }}>
-                          <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: '#EF4444' }}>
-                            🎯 Goal Target Date Due Today
-                          </span>
-                          <span className="badge badge-info" style={{ textTransform: 'capitalize' }}>
-                            {goal.category || 'Goal'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                {/* 2. Events list */}
-                {selectedDayEvents.map(event => (
-                  <div
-                    key={event.id}
-                    className="card fade-in-up"
-                    style={{
-                      borderLeft: `4px solid ${event.color || '#6366F1'}`,
-                      position: 'relative',
-                    }}
-                  >
-                    <div style={{ padding: 'var(--space-3) var(--space-4)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                      <div
-                        style={{
-                          width: 38,
-                          height: 38,
-                          borderRadius: 'var(--radius-md)',
-                          background: typeGradients[event.type] || typeGradients.event,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: 18,
-                          color: 'white',
-                          flexShrink: 0,
-                        }}
-                      >
-                        {typeIcons[event.type] || '📅'}
-                      </div>
-
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text-primary)' }}>
-                          {event.title}
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 2 }}>
-                          <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--brand-primary)' }}>
-                            {format(new Date(event.startTime), 'h:mm a')} – {format(new Date(event.endTime), 'h:mm a')}
-                          </span>
-                          <span className="badge badge-info" style={{ textTransform: 'capitalize' }}>
-                            {event.type}
-                          </span>
-                          {event.location && (
-                            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
-                              📍 {event.location}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div style={{ position: 'relative' }}>
-                        <button
-                          onClick={() => handleDeleteEvent(event.id, event.title)}
-                          style={{ border: 'none', background: 'transparent', color: 'var(--text-tertiary)', fontSize: 18, cursor: 'pointer', padding: 4 }}
-                          title="Delete event"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                {/* 3. Scheduled Tasks & Reminders for this day */}
-                {selectedDayTasks.map(task => {
-                  const isDone = task.status === 'completed'
-                  return (
-                    <div
-                      key={task.id}
-                      className="card fade-in-up"
-                      style={{
-                        borderLeft: `4px solid ${priorityColors[task.priority] || 'var(--brand-primary)'}`,
-                        opacity: isDone ? 0.75 : 1,
-                      }}
-                    >
-                      <div style={{ padding: 'var(--space-3) var(--space-4)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleToggleTask(task)}
-                          style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: 'var(--radius-full)',
-                            background: isDone ? 'var(--brand-accent, #10B981)' : 'var(--bg-subtle)',
-                            border: `2px solid ${isDone ? 'var(--brand-accent, #10B981)' : 'var(--border-default)'}`,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: 14,
-                            color: 'white',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            flexShrink: 0,
-                          }}
-                          title={isDone ? 'Mark as planned' : 'Mark as completed'}
-                        >
-                          {isDone ? '✓' : ''}
-                        </button>
-
-                        <div style={{ flex: 1 }}>
-                          <div style={{
-                            fontFamily: 'var(--font-display)',
-                            fontSize: 'var(--text-base)',
-                            fontWeight: 700,
-                            color: 'var(--text-primary)',
-                            textDecoration: isDone ? 'line-through' : 'none',
-                          }}>
-                            {task.title}
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 2, flexWrap: 'wrap' }}>
-                            {isDone && task.completedAt && (
-                              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--brand-accent, #10B981)' }}>
-                                ✓ Completed {format(new Date(task.completedAt), 'h:mm a')}
-                              </span>
-                            )}
-                            {task.scheduledStart && (
-                              <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                                ⏰ {format(new Date(task.scheduledStart), 'h:mm a')}
-                              </span>
-                            )}
-                            {task.deadline && (
-                              <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--priority-high)' }}>
-                                Due {format(new Date(task.deadline), 'h:mm a')}
-                              </span>
-                            )}
-                            {task.estimatedMinutes && (
-                              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
-                                {task.estimatedMinutes}m
-                              </span>
-                            )}
-                            <span
-                              style={{
-                                fontSize: '10px',
-                                fontWeight: 700,
-                                textTransform: 'uppercase',
-                                color: priorityColors[task.priority],
-                              }}
-                            >
-                              {task.priority}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-
-            {/* 4. Habits daily row with 1-tap toggle for this day */}
-            {selectedDayHabits.length > 0 && (
-              <div style={{ marginTop: 'var(--space-5)' }}>
-                <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>
-                  Daily Habits ({selectedDayHabits.length})
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {selectedDayHabits.map(habit => {
-                    const isHabitDone = habitLogs.some(
-                      l => l.habitId === habit.id && l.date === selectedDayStr && l.status === 'completed'
-                    )
-
-                    return (
-                      <div
-                        key={habit.id}
-                        className="card"
-                        style={{
-                          padding: '10px 14px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          borderLeft: `3px solid ${isHabitDone ? 'var(--brand-accent, #10B981)' : 'var(--border-default)'}`,
-                          background: isHabitDone ? 'linear-gradient(90deg, rgba(16,185,129,0.06), var(--bg-surface))' : 'var(--bg-surface)',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <button
-                            type="button"
-                            onClick={() => handleToggleHabit(habit.id, isHabitDone)}
-                            style={{
-                              width: 28,
-                              height: 28,
-                              borderRadius: 'var(--radius-full)',
-                              background: isHabitDone ? 'var(--brand-accent, #10B981)' : 'transparent',
-                              border: `2px solid ${isHabitDone ? 'var(--brand-accent, #10B981)' : 'var(--border-strong)'}`,
-                              color: 'white',
-                              fontSize: 13,
-                              fontWeight: 800,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer',
-                              flexShrink: 0,
-                            }}
-                            title={isHabitDone ? 'Mark undone for this date' : 'Mark done for this date'}
-                          >
-                            {isHabitDone ? '✓' : ''}
-                          </button>
-
-                          <div>
-                            <div style={{
-                              fontSize: 'var(--text-sm)',
-                              fontWeight: 700,
-                              color: 'var(--text-primary)',
-                              textDecoration: isHabitDone ? 'line-through' : 'none',
-                            }}>
-                              {habit.title}
-                            </div>
-                            {habit.scheduledTime && (
-                              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
-                                ⏰ {habit.scheduledTime}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--brand-warm)' }}>
-                            🔥 {habit.currentStreak}d
-                          </span>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
+          <button
+            className="cal-header-add-btn"
+            onClick={() => setShowAddSheet(true)}
+            title="Add Task or Event"
+            id="cal-header-add-btn"
+          >
+            <PlusIconSvg />
+            <span>Add</span>
+          </button>
         </div>
+      </div>
+
+      {/* ── SUB-HEADER: WEEK OF [DATE] WITH NAVIGATION ── */}
+      <div className="modern-cal-week-label">
+        <button className="modern-cal-nav-arrow" onClick={prevPeriod} title="Previous period" aria-label="Previous">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+        <span className="cal-week-label-text">
+          {calendarMode === 'week' ? `Week of ${format(weekStart, 'MMMM d')}` : format(currentDate, 'MMMM yyyy')}
+        </span>
+        <button className="modern-cal-nav-arrow" onClick={nextPeriod} title="Next period" aria-label="Next">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+      </div>
+
+      {/* ── 7-DAY HORIZONTAL WEEK STRIP (WEEK VIEW) ── */}
+      {calendarMode === 'week' ? (
+        <div className="modern-cal-strip">
+          {weekDays.map((day, idx) => {
+            const isSel = isSameDay(day, selectedDate)
+            const dayOfWeek = day.getDay()
+            const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
+            return (
+              <div
+                key={idx}
+                className={`modern-day-pill ${isSel ? 'active' : ''}`}
+                onClick={() => setSelectedDate(day)}
+                id={`cal-day-pill-${idx}`}
+              >
+                <span className={`modern-day-tag ${isWeekend ? 'weekend' : 'weekday'}`}>
+                  {format(day, 'EEE')}
+                </span>
+                <span className={`modern-day-number ${isWeekend ? 'weekend' : ''}`}>
+                  {format(day, 'd')}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        /* ── FULL MONTH GRID VIEW (WHEN TOGGLED) ── */
+        <div className="card fade-in-up" style={{ margin: '0 16px 16px 16px', padding: '14px', borderRadius: 20 }}>
+          <div className="calendar-grid" style={{ marginBottom: 8 }}>
+            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => (
+              <div key={d} className="calendar-day-header" style={{ fontSize: '11px', fontWeight: 700, color: '#64748B' }}>
+                {d}
+              </div>
+            ))}
+          </div>
+          <div className="calendar-grid">
+            {paddedMonthDays.map((day, i) => {
+              if (!day) return <div key={i} />
+              const isSel = isSameDay(day, selectedDate)
+              const isTod = isToday(day)
+              const isCurr = isSameMonth(day, currentDate)
+              return (
+                <div
+                  key={i}
+                  className={`calendar-day ${isTod ? 'today' : ''} ${isSel && !isTod ? 'selected' : ''} ${!isCurr ? 'other-month' : ''}`}
+                  onClick={() => {
+                    setSelectedDate(day)
+                    setCalendarMode('week')
+                  }}
+                  style={{ height: 42, borderRadius: 12, cursor: 'pointer' }}
+                >
+                  <span className="calendar-day-num" style={{ fontSize: '12px' }}>{format(day, 'd')}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── TODAY SUMMARY BOX ── */}
+      <div className="modern-cal-summary-box">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div className="modern-cal-summary-title">
+            {isToday(selectedDate) ? 'Today' : format(selectedDate, 'EEEE')}
+          </div>
+          {totalActivitiesCount > 0 && (
+            <button
+              onClick={() => setShowOptimizerModal(true)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(234, 88, 12, 0.12))',
+                border: '1px solid rgba(245, 158, 11, 0.28)',
+                color: '#D97706',
+                fontWeight: 800,
+                fontSize: '11px',
+                padding: '4px 10px',
+                borderRadius: 12,
+                cursor: 'pointer',
+              }}
+              title="Scan schedule for overload and resolve conflicts"
+              id="cal-ai-optimizer-btn"
+            >
+              <span>⚡</span>
+              <span>AI Optimizer</span>
+            </button>
+          )}
+        </div>
+        <div className="modern-cal-summary-sub">
+          {totalActivitiesCount > 0 ? (
+            <>
+              You completed <span className="modern-cal-counter-highlight">{completedActivitiesCount}/{totalActivitiesCount}</span> {totalActivitiesCount === 1 ? 'activity' : 'activities'} scheduled
+            </>
+          ) : (
+            <span>No scheduled activities for this day</span>
+          )}
+        </div>
+      </div>
+
+      {/* ── SCHEDULE TIMELINE OR EMPTY STATE ── */}
+      <div className="modern-timeline-container">
+        {displayedActivities.length > 0 ? (
+          <div className="modern-timeline-list">
+            {displayedActivities.map((act, index) => (
+              <div key={act.id} className="modern-timeline-row">
+                {/* Left Timeline Axis */}
+                <div className="modern-timeline-axis-cell">
+                  {act.isNow ? (
+                    <span className="modern-timeline-now-pill">Now</span>
+                  ) : (
+                    <span className="modern-timeline-time-label">{act.timeLabel}</span>
+                  )}
+
+                  {/* Connector dots leading to next item */}
+                  {index < displayedActivities.length - 1 ? (
+                    <div className={`modern-timeline-dots-connector ${act.isNow ? 'connector-active' : ''}`} />
+                  ) : (
+                    <div className="modern-timeline-dots-connector-end" />
+                  )}
+                </div>
+
+                {/* Right Activity Card */}
+                <div className="modern-timeline-card-cell">
+                  <div
+                    className={`modern-activity-card ${act.theme} fade-in-up`}
+                    onClick={act.onToggle}
+                    title="Click to toggle completed or manage"
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        className="modern-activity-title"
+                        style={{
+                          textDecoration: act.isDone ? 'line-through' : 'none',
+                          opacity: act.isDone ? 0.6 : 1,
+                        }}
+                      >
+                        {act.title}
+                      </div>
+                      <div className={`modern-activity-subtitle ${act.subtitleClass || ''}`}>
+                        <ClockIconSvg color={act.subtitleClass === 'accent-blue' ? '#0284C7' : '#94A3B8'} />
+                        <span>{act.subtitle}</span>
+                      </div>
+                    </div>
+
+                    {/* Illustration / Graphic */}
+                    <div className="modern-activity-graphic">
+                      {act.graphic}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* Quick Action Buttons Row */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingLeft: 64 }}>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => router.push('/chat')}
+                style={{ fontSize: '12px', borderRadius: 16, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 6 }}
+              >
+                <span>✨</span> Plan with AI
+              </button>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => setShowAddSheet(true)}
+                style={{ fontSize: '12px', borderRadius: 16, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6 }}
+              >
+                <span>+</span> Add Activity
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="calendar-empty-state fade-in-up">
+            <div className="calendar-empty-icon-box">
+              <CalendarEmptySvg />
+            </div>
+            <div className="calendar-empty-title">No activities scheduled</div>
+            <p className="calendar-empty-desc">
+              {isToday(selectedDate)
+                ? 'Your schedule is clear for today. Add tasks, meetings, or study blocks.'
+                : `No tasks or events recorded for ${format(selectedDate, 'EEEE, MMMM d')}.`}
+            </p>
+            <div className="calendar-empty-actions">
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => setShowAddSheet(true)}
+                style={{ borderRadius: 14, padding: '9px 18px', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
+                id="cal-empty-add-btn"
+              >
+                <PlusIconSvg />
+                <span>Add Task / Event</span>
+              </button>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => router.push('/chat')}
+                style={{ borderRadius: 14, padding: '9px 16px', display: 'flex', alignItems: 'center', gap: 6 }}
+                id="cal-empty-plan-ai-btn"
+              >
+                <span>✨</span>
+                <span>Plan with AI</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── ADD EVENT / TASK SHEET ─────────────────────────── */}
@@ -1032,6 +979,20 @@ export default function CalendarPage() {
             )}
           </div>
         </>
+      )}
+
+      {showOptimizerModal && (
+        <ScheduleOptimizerModal
+          isOpen={showOptimizerModal}
+          selectedDate={selectedDate}
+          onClose={() => {
+            setShowOptimizerModal(false)
+            loadAllCalendarData()
+          }}
+          onScheduleOptimized={() => {
+            loadAllCalendarData()
+          }}
+        />
       )}
 
       <BottomNav />

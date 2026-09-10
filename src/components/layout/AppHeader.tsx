@@ -28,18 +28,30 @@ const BellIcon = () => (
 )
 
 const BackIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="15,18 9,12 15,6" />
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.3} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M15 18l-6-6 6-6" />
   </svg>
 )
 
 const PaletteIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" />
-    <circle cx="17.5" cy="10.5" r=".5" fill="currentColor" />
-    <circle cx="8.5" cy="7.5" r=".5" fill="currentColor" />
-    <circle cx="6.5" cy="12.5" r=".5" fill="currentColor" />
+    <circle cx="13.5" cy="6.5" r=".7" fill="currentColor" />
+    <circle cx="17.5" cy="10.5" r=".7" fill="currentColor" />
+    <circle cx="8.5" cy="7.5" r=".7" fill="currentColor" />
+    <circle cx="6.5" cy="12.5" r=".7" fill="currentColor" />
     <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
+  </svg>
+)
+
+const SparkleIcon = () => (
+  <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 20, height: 20 }}>
+    <path d="M12 2L14.4 8.6L21 11L14.4 13.4L12 20L9.6 13.4L3 11L9.6 8.6L12 2Z" />
+  </svg>
+)
+
+const CheckIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" style={{ width: 14, height: 14 }}>
+    <polyline points="20 6 9 17 4 12" />
   </svg>
 )
 
@@ -49,23 +61,26 @@ export default function AppHeader({ title, subtitle, showBack, showBrand = true,
   const [showThemes, setShowThemes] = useState(false)
   const [activeTheme, setActiveTheme] = useState('indigo')
   const [assistantName, setAssistantName] = useState('Srushti')
+  const [userName, setUserName] = useState('You')
   const themeMenuRef = useRef<HTMLDivElement>(null)
 
-  // Initialize theme & assistant name from storage
+  // Initialize theme, assistant name, and user name from storage
   useEffect(() => {
-    const saved = localStorage.getItem('srushti_theme') || 'indigo'
-    setActiveTheme(saved)
-    document.documentElement.setAttribute('data-theme', saved)
-    document.body.setAttribute('data-theme', saved)
+    const savedTheme = localStorage.getItem('srushti_theme') || 'indigo'
+    setActiveTheme(savedTheme)
+    document.documentElement.setAttribute('data-theme', savedTheme)
+    document.body.setAttribute('data-theme', savedTheme)
 
-    const loadAssistantName = () => {
+    const loadProfileData = () => {
       const name = localStorage.getItem('srushti_assistant_name') || 'Srushti'
       setAssistantName(name)
+      const user = localStorage.getItem('srushti_user_name') || 'You'
+      setUserName(user)
     }
-    loadAssistantName()
+    loadProfileData()
 
-    window.addEventListener('srushti_data_changed', loadAssistantName)
-    return () => window.removeEventListener('srushti_data_changed', loadAssistantName)
+    window.addEventListener('srushti_data_changed', loadProfileData)
+    return () => window.removeEventListener('srushti_data_changed', loadProfileData)
   }, [])
 
   const selectTheme = (themeId: string) => {
@@ -76,7 +91,7 @@ export default function AppHeader({ title, subtitle, showBack, showBrand = true,
     setShowThemes(false)
   }
 
-  // Click outside to close
+  // Click outside to close theme popover
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (themeMenuRef.current && !themeMenuRef.current.contains(event.target as Node)) {
@@ -103,34 +118,141 @@ export default function AppHeader({ title, subtitle, showBack, showBrand = true,
     return () => clearInterval(interval)
   }, [])
 
+  const userInitial = (userName.trim()[0] || 'Y').toUpperCase()
+
   return (
     <header className="app-header">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2.5">
         {showBack && (
           <button
             onClick={() => router.back()}
-            className="btn-icon btn btn-secondary"
+            className="header-back-btn"
             id="header-back-btn"
+            aria-label="Go back"
           >
             <BackIcon />
           </button>
         )}
+
         {showBrand && !showBack && (
-          <div className="app-header-brand" onClick={() => router.push('/')} style={{ cursor: 'pointer' }}>
-            <span className="app-header-name">{assistantName}</span>
-            <span className="app-header-sub">~ By Team SDR</span>
+          <div
+            className="app-header-brand"
+            onClick={() => router.push('/')}
+            title="Home"
+          >
+            <div className="header-avatar-orb">
+              <SparkleIcon />
+            </div>
+            <div className="header-brand-info">
+              <div className="header-title-row">
+                <span className="app-header-name">{assistantName}</span>
+                <span className="header-status-pill">AI</span>
+              </div>
+              <div className="app-header-team-pill">
+                <span className="team-pill-dot" />
+                <span>BY TEAM SDR</span>
+              </div>
+            </div>
           </div>
         )}
+
         {(title || subtitle) && (
-          <div>
-            {title && <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-lg)', fontWeight: 700, color: 'var(--text-primary)' }}>{title}</div>}
-            {subtitle && <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>{subtitle}</div>}
+          <div style={{ marginLeft: showBack ? 2 : 0 }}>
+            {title && (
+              <div style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: '18px',
+                fontWeight: 700,
+                color: 'var(--text-primary)',
+                letterSpacing: '-0.01em',
+                lineHeight: 1.2
+              }}>
+                {title}
+              </div>
+            )}
+            {subtitle && (
+              <div style={{
+                fontSize: '11.5px',
+                fontWeight: 500,
+                color: 'var(--text-tertiary)',
+                marginTop: '1px'
+              }}>
+                {subtitle}
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      <div className="app-header-actions" style={{ position: 'relative' }}>
-        {rightContent}
+      <div className="app-header-actions" ref={themeMenuRef}>
+        {rightContent ? (
+          rightContent
+        ) : (
+          <>
+            {/* Theme switcher */}
+            <button
+              className={`header-action-btn ${showThemes ? 'active' : ''}`}
+              onClick={() => setShowThemes(!showThemes)}
+              title="Change Theme"
+              id="header-theme-btn"
+              aria-label="Theme settings"
+            >
+              <PaletteIcon />
+            </button>
+
+            {/* Notifications */}
+            <button
+              className="header-action-btn"
+              onClick={() => router.push('/notifications')}
+              title="Notifications"
+              id="header-notif-btn"
+              aria-label="Notifications"
+            >
+              <BellIcon />
+              {unreadCount > 0 && <span className="header-badge-dot" />}
+            </button>
+
+            {/* User Profile Avatar */}
+            <button
+              className="header-user-avatar"
+              onClick={() => router.push('/settings')}
+              title={`Settings (${userName})`}
+              id="header-profile-btn"
+              aria-label="User profile settings"
+            >
+              {userInitial}
+            </button>
+          </>
+        )}
+
+        {/* Floating Theme Dropdown */}
+        {showThemes && (
+          <div className="theme-dropdown">
+            <div className="theme-dropdown-header">Color Theme</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {THEMES.map(theme => (
+                <button
+                  key={theme.id}
+                  className={`theme-dropdown-item ${activeTheme === theme.id ? 'active' : ''}`}
+                  onClick={() => selectTheme(theme.id)}
+                >
+                  <div className="theme-item-left">
+                    <span
+                      className="theme-color-dot"
+                      style={{ background: `linear-gradient(135deg, ${theme.color}, ${theme.secondary})` }}
+                    />
+                    <span className="theme-item-name">{theme.name}</span>
+                  </div>
+                  {activeTheme === theme.id && (
+                    <span style={{ color: 'var(--brand-primary)' }}>
+                      <CheckIcon />
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </header>
   )
