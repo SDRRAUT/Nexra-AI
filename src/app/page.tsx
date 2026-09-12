@@ -684,68 +684,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* ── 2. PRODUCTIVITY PULSE (MODERN ANALYTICS BENTO) ───────────── */}
-        <div className="page-section">
-          <div className="home-section-header">
-            <div className="home-section-title">
-              <span>📊</span> Productivity Pulse
-            </div>
-            <span className="home-section-link" onClick={() => router.push('/calendar')}>
-              Week View →
-            </span>
-          </div>
 
-          {/* Single-Line Horizontal Analytics Cards */}
-          <div className="home-bento-grid">
-            {/* Card 1: Focus Hours */}
-            <div className="bento-stat-card bento-cyan fade-in-up">
-              <div className="bento-top-row">
-                <div className="bento-icon-box" style={{ color: '#0284C7' }}>⚡</div>
-                <span className="bento-pill-badge" style={{ color: '#0284C7' }}>+35m</span>
-              </div>
-              <div>
-                <div className="bento-value">2.5h</div>
-                <div className="bento-label">Focus</div>
-              </div>
-            </div>
-
-            {/* Card 2: Tasks Done */}
-            <div className="bento-stat-card bento-emerald fade-in-up">
-              <div className="bento-top-row">
-                <div className="bento-icon-box" style={{ color: '#059669' }}>🎯</div>
-                <span className="bento-pill-badge" style={{ color: '#059669' }}>{progressPercent}%</span>
-              </div>
-              <div>
-                <div className="bento-value">{completedCount}/{totalCount}</div>
-                <div className="bento-label">Tasks</div>
-              </div>
-            </div>
-
-            {/* Card 3: Momentum */}
-            <div className="bento-stat-card bento-amber fade-in-up">
-              <div className="bento-top-row">
-                <div className="bento-icon-box" style={{ color: '#D97706' }}>🔥</div>
-                <span className="bento-pill-badge" style={{ color: '#D97706' }}>Best</span>
-              </div>
-              <div>
-                <div className="bento-value">7 Days</div>
-                <div className="bento-label">Streak</div>
-              </div>
-            </div>
-
-            {/* Card 4: Flow Score */}
-            <div className="bento-stat-card bento-rose fade-in-up">
-              <div className="bento-top-row">
-                <div className="bento-icon-box" style={{ color: '#E11D48' }}>📈</div>
-                <span className="bento-pill-badge" style={{ color: '#E11D48' }}>Peak</span>
-              </div>
-              <div>
-                <div className="bento-value">94</div>
-                <div className="bento-label">Energy</div>
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* ── 3. NEXT UP / FOCUS NOW (PASTEL ACTION CARD) ───────────────── */}
         {data?.today.nextTask && data.today.nextTask.status !== 'completed' && (
