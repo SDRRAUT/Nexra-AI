@@ -498,31 +498,7 @@ export default function HomePage() {
 
   return (
     <div className="app-shell">
-      <AppHeader
-        rightContent={
-          <button
-            onClick={() => setShowAddSheet(true)}
-            title="Quick Add Task (No AI)"
-            className="notif-btn"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'var(--brand-primary, #6366F1)',
-              color: '#FFFFFF',
-              border: 'none',
-              borderRadius: '50%',
-              width: 36,
-              height: 36,
-              cursor: 'pointer',
-              boxShadow: '0 2px 8px rgba(99, 102, 241, 0.35)',
-            }}
-            id="header-quick-add-task-btn"
-          >
-            <PlusIcon />
-          </button>
-        }
-      />
+      <AppHeader />
 
       <div className="page-content" style={{ paddingBottom: '95px' }}>
 
@@ -948,18 +924,6 @@ export default function HomePage() {
             </div>
           </div>
         )}
-
-        {/* Floating Quick-Add Task Button (No AI required) */}
-        <button
-          className="home-floating-add-btn fade-in-up"
-          onClick={() => setShowAddSheet(true)}
-          title="Quick Add Task"
-          id="home-fab-add-task"
-          aria-label="Quick Add Task"
-        >
-          <PlusIcon />
-        </button>
-
       </div>
 
       {/* ── QUICK ADD TASK BOTTOM SHEET (NO AI REQUIRED) ─────────────────────────── */}
@@ -1148,6 +1112,17 @@ export default function HomePage() {
           }}
         />
       )}
+
+      {/* Floating Action Button (FAB) anchored at bottom-right directly above BottomNav */}
+      <button
+        className="home-floating-add-btn fade-in-up"
+        onClick={() => setShowAddSheet(true)}
+        title="Quick Add Task"
+        id="home-fab-add-task"
+        aria-label="Quick Add Task"
+      >
+        <PlusIcon />
+      </button>
 
       <BottomNav />
     </div>

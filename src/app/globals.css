@@ -4694,8 +4694,8 @@ input, textarea, select { font-family: inherit; }
 /* Floating Quick Add Task Button (No AI Required) */
 .home-floating-add-btn {
   position: fixed;
-  right: 20px;
-  bottom: calc(var(--bottom-nav-height, 64px) + env(safe-area-inset-bottom, 12px) + 16px);
+  right: max(20px, calc((100vw - 430px) / 2 + 18px));
+  bottom: calc(var(--bottom-nav-height, 64px) + env(safe-area-inset-bottom, 12px) + 20px);
   width: 52px;
   height: 52px;
   border-radius: 50%;
@@ -4705,15 +4705,15 @@ input, textarea, select { font-family: inherit; }
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 24px rgba(79, 70, 229, 0.4);
+  box-shadow: 0 8px 24px rgba(79, 70, 229, 0.45);
   cursor: pointer;
-  z-index: 950;
+  z-index: 990;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .home-floating-add-btn:hover {
   transform: scale(1.08) translateY(-2px);
-  box-shadow: 0 12px 28px rgba(79, 70, 229, 0.5);
+  box-shadow: 0 12px 28px rgba(79, 70, 229, 0.55);
 }
 
 .home-floating-add-btn:active {
