@@ -73,7 +73,7 @@ export default function AppHeader({ title, subtitle, showBack, showBrand = true,
 
     const loadProfileData = () => {
       const stored = localStorage.getItem('srushti_assistant_name')
-      if (!stored || stored === 'Srushti' || stored === 'Spark' || stored === 'Personal Assistant') {
+      if (!stored || stored.toLowerCase().includes('srushti') || stored === 'Spark' || stored === 'Personal Assistant') {
         setAssistantName('Nexra')
         localStorage.setItem('srushti_assistant_name', 'Nexra')
       } else {

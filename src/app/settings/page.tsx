@@ -98,9 +98,12 @@ export default function SettingsPage() {
       }
 
       let savedAssistantName = typeof localStorage !== 'undefined' ? localStorage.getItem('srushti_assistant_name') : ''
-      if (!savedAssistantName || savedAssistantName === 'Srushti' || savedAssistantName === 'Spark' || savedAssistantName === 'Personal Assistant') {
-        const pref = await localDb.preferences.get('assistant_name').catch(() => null)
-        savedAssistantName = pref?.value && pref.value !== 'Srushti' && pref.value !== 'Spark' ? pref.value : 'Nexra'
+      const pref = await localDb.preferences.get('assistant_name').catch(() => null)
+      if (!savedAssistantName || savedAssistantName.toLowerCase().includes('srushti') || savedAssistantName === 'Spark' || savedAssistantName === 'Personal Assistant') {
+        savedAssistantName = pref?.value && !pref.value.toLowerCase().includes('srushti') && pref.value !== 'Spark' ? pref.value : 'Nexra'
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('srushti_assistant_name', savedAssistantName)
+        }
       }
 
       setSettings(prev => ({
@@ -282,7 +285,7 @@ export default function SettingsPage() {
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `srushti-backup-${new Date().toISOString().split('T')[0]}.json`
+      a.download = `nexra-backup-${new Date().toISOString().split('T')[0]}.json`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)

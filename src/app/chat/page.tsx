@@ -286,7 +286,7 @@ export default function ChatPage() {
     setIsFetchingHistory(true)
     try {
       let name = localStorage.getItem('srushti_assistant_name') || 'Nexra'
-      if (name === 'Srushti' || name === 'Spark' || name === 'Personal Assistant') {
+      if (!name || name.toLowerCase().includes('srushti') || name === 'Spark' || name === 'Personal Assistant') {
         name = 'Nexra'
         localStorage.setItem('srushti_assistant_name', 'Nexra')
       }
@@ -333,7 +333,7 @@ export default function ChatPage() {
 
     const handleDataChanged = () => {
       let name = localStorage.getItem('srushti_assistant_name') || 'Nexra'
-      if (name === 'Srushti' || name === 'Spark' || name === 'Personal Assistant') {
+      if (!name || name.toLowerCase().includes('srushti') || name === 'Spark' || name === 'Personal Assistant') {
         name = 'Nexra'
       }
       setAssistantName(name)

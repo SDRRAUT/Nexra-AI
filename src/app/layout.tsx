@@ -2,12 +2,12 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Nexra — The Next Layer of Your Life',
-  description: 'Nexra — The next layer of your life. Your intelligent autonomous personal AI assistant that manages your schedule, focus flow, and holistic balance.',
+  title: 'Nexra AI — The Next Layer of Your Life',
+  description: 'Nexra AI — The next layer of your life. Your intelligent autonomous personal AI assistant that manages your schedule, focus flow, and holistic balance.',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'Nexra',
+    title: 'Nexra AI',
   },
   formatDetection: { telephone: false },
 }

@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Nexra</string>
-    <string name="title_activity_main">Nexra</string>
+    <string name="app_name">Nexra AI</string>
+    <string name="title_activity_main">Nexra AI</string>
     <string name="package_name">com.sdr.srushtiai</string>
     <string name="custom_url_scheme">com.sdr.srushtiai</string>
 </resources>
