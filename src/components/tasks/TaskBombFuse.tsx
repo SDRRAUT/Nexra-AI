@@ -23,8 +23,9 @@ export function TaskBombFuse({ task, urgentOverride = false, compact = false }: 
       return {
         status: 'defused' as const,
         percent: 0,
-        statusText: '🛡️ DEFUSED',
-        timeText: 'Complete',
+        statusText: 'Completed',
+        statusIcon: '✓',
+        timeText: 'Done',
         statusColor: '#10B981',
         bombEmoji: '🛡️',
       }
@@ -56,7 +57,6 @@ export function TaskBombFuse({ task, urgentOverride = false, compact = false }: 
         targetTime = endOfDay.getTime()
       }
     } else {
-      // Default to End of Today
       const endOfDay = new Date()
       endOfDay.setHours(23, 59, 59, 999)
       targetTime = endOfDay.getTime()
@@ -64,7 +64,7 @@ export function TaskBombFuse({ task, urgentOverride = false, compact = false }: 
 
     const diffMs = targetTime - now
 
-    // ── 1. BOMB BLASTED (OVERDUE) ───────────────────────────────────
+    // ── 1. OVERDUE ──────────────────────────────────────────────────
     if (diffMs <= 0) {
       const overdueMins = Math.max(1, Math.round(Math.abs(diffMs) / (1000 * 60)))
       const overdueStr =
@@ -75,8 +75,9 @@ export function TaskBombFuse({ task, urgentOverride = false, compact = false }: 
       return {
         status: 'blasted' as const,
         percent: 100,
-        statusText: '💥 BLASTED!',
-        timeText: `${overdueStr} Overdue`,
+        statusText: 'Overdue',
+        statusIcon: '💥',
+        timeText: `${overdueStr} late`,
         statusColor: '#EF4444',
         bombEmoji: '💥',
       }
@@ -84,14 +85,14 @@ export function TaskBombFuse({ task, urgentOverride = false, compact = false }: 
 
     // ── 2. BURNING / TICKING DOWN ───────────────────────────────────
     const diffMins = Math.max(1, Math.round(diffMs / (1000 * 60)))
-    const isCritical =
-      task.priority === 'critical' || urgentOverride || diffMins <= 60
+    // Only mark critical if under 60 minutes or explicitly critical under 2 hours
+    const isCritical = diffMins <= 60 || (task.priority === 'critical' && diffMins <= 180)
 
-    // Reference timeline window: 8 hours (or total from day start)
+    // Reference timeline window: 8 hours (or 1 day)
     const windowMs = 8 * 60 * 60 * 1000
-    // Scale burn percent from 15% (just ignited) to 95% (right at the bomb wick)
     const rawBurned = 1 - Math.min(Math.max(diffMs / windowMs, 0), 1)
-    const percent = Math.min(95, Math.max(15, Math.round(rawBurned * 100)))
+    // Scale burn percent from 10% to 92%
+    const percent = Math.min(92, Math.max(12, Math.round(rawBurned * 100)))
 
     const timeText =
       diffMins < 60
@@ -103,10 +104,11 @@ export function TaskBombFuse({ task, urgentOverride = false, compact = false }: 
     if (isCritical) {
       return {
         status: 'urgent' as const,
-        percent: Math.max(percent, 80), // spark right at the bomb!
-        statusText: '💣 TICKING URGENT',
+        percent: Math.max(percent, 80),
+        statusText: 'Urgent Deadline',
+        statusIcon: '⚡',
         timeText,
-        statusColor: '#F59E0B',
+        statusColor: '#EF4444',
         bombEmoji: '💣',
       }
     }
@@ -114,9 +116,10 @@ export function TaskBombFuse({ task, urgentOverride = false, compact = false }: 
     return {
       status: 'burning' as const,
       percent,
-      statusText: '🔥 FUSE BURNING',
-      timeText: hasExplicitTime ? timeText : `Today · ${timeText}`,
-      statusColor: '#EA580C',
+      statusText: 'Active Fuse',
+      statusIcon: '🔥',
+      timeText: hasExplicitTime ? timeText : `${timeText}`,
+      statusColor: '#D97706',
       bombEmoji: '💣',
     }
   }, [task, urgentOverride])
@@ -127,12 +130,13 @@ export function TaskBombFuse({ task, urgentOverride = false, compact = false }: 
         compact ? 'compact' : ''
       }`}
     >
-      {/* Top micro-header with status & countdown */}
+      {/* Top clean micro-header */}
       <div className="task-bomb-fuse-header">
         <div
           className="task-bomb-fuse-status"
           style={{ color: fuseState.statusColor }}
         >
+          <span style={{ fontSize: '11px' }}>{fuseState.statusIcon}</span>
           <span>{fuseState.statusText}</span>
         </div>
         <div
@@ -143,39 +147,30 @@ export function TaskBombFuse({ task, urgentOverride = false, compact = false }: 
         </div>
       </div>
 
-      {/* Burning Fuse Track */}
+      {/* Ultra-slim Minimalist Fuse Track */}
       <div className="task-bomb-fuse-track-row">
-        <div className="task-bomb-fuse-rope-track">
-          {/* Burned charred ash segment */}
+        <div className="task-bomb-fuse-track-bg">
+          {/* Active Burning Progress Line */}
           <div
-            className="task-bomb-fuse-rope-burned"
+            className={`task-bomb-fuse-progress ${fuseState.status}`}
             style={{ width: `${fuseState.percent}%` }}
           />
 
-          {/* Sizzling Flame & Spark at the burning tip */}
+          {/* Minimalist Glowing Spark Tip */}
           {fuseState.status !== 'defused' && (
             <div
-              className="task-bomb-fuse-spark-head"
+              className="task-bomb-fuse-spark"
               style={{ left: `${fuseState.percent}%` }}
             >
-              <span className="task-bomb-fuse-spark-flame">🔥</span>
-              <span className="task-bomb-fuse-spark-ember" />
+              <span className="task-bomb-fuse-spark-dot" />
             </div>
           )}
         </div>
 
-        {/* Bomb / Blast / Defused Icon at the end */}
+        {/* Minimal Bomb Icon */}
         <div
           className={`task-bomb-fuse-bomb-icon ${fuseState.status}`}
-          title={
-            fuseState.status === 'blasted'
-              ? 'Deadline blasted!'
-              : fuseState.status === 'urgent'
-              ? 'Detonating soon!'
-              : fuseState.status === 'defused'
-              ? 'Defused'
-              : 'Fuse burning towards deadline'
-          }
+          title={fuseState.statusText}
         >
           {fuseState.bombEmoji}
         </div>

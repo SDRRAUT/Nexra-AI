@@ -677,7 +677,7 @@ export default function HomePage() {
               </div>
             </div>
             <div className="home-task-card-wrapper fade-in-up">
-              <TaskBombFuse task={data.today.nextTask} urgentOverride />
+              <TaskBombFuse task={data.today.nextTask} />
               <div className="home-next-task-card" style={{ border: 'none', background: 'transparent', margin: 0, borderRadius: 0, padding: '12px 14px' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 3 }}>
