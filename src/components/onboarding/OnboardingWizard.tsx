@@ -5,6 +5,7 @@ import { generateInitialPlanFromOnboarding, type OnboardingAnswers } from '@/lib
 
 interface OnboardingWizardProps {
   onCompleted: () => void
+  isDemo?: boolean
 }
 
 function parse24To12(time24: string) {
@@ -26,23 +27,23 @@ function format12To24(hour12: string, minute: string, ampm: 'AM' | 'PM') {
   return `${hStr}:${minute}`
 }
 
-export default function OnboardingWizard({ onCompleted }: OnboardingWizardProps) {
+export default function OnboardingWizard({ onCompleted, isDemo = false }: OnboardingWizardProps) {
   const [step, setStep] = useState(1)
   const [isGenerating, setIsGenerating] = useState(false)
   const [generationStatus, setGenerationStatus] = useState('Initializing your personal assistant...')
   const [validationError, setValidationError] = useState<string | null>(null)
 
   const [answers, setAnswers] = useState<OnboardingAnswers>({
-    name: '',
+    name: isDemo ? 'Demo User' : '',
     assistantName: 'Nexra',
     role: 'Student',
-    mainGoals: '',
+    mainGoals: isDemo ? 'Master Productivity & Deep Focus' : '',
     dailyRoutine: {
       wakeTime: '07:00',
       sleepTime: '23:30',
       focusHours: 4,
     },
-    habitsToBuild: '',
+    habitsToBuild: isDemo ? 'Morning Meditation, Read 30 mins' : '',
     upcomingDeadlines: '',
     aiTone: 'autonomous',
     apiKey: '',
@@ -55,6 +56,18 @@ export default function OnboardingWizard({ onCompleted }: OnboardingWizardProps)
       setStep(prev => prev + 1)
       setValidationError(null)
     } else if (step === totalSteps) {
+      // If Demo mode, don't pollute real database
+      if (isDemo) {
+        setIsGenerating(true)
+        setGenerationStatus('Demo Preview: Simulating personalized goals & schedule...')
+        await new Promise(r => setTimeout(r, 600))
+        setGenerationStatus('✅ Demo complete! (Your real database & tasks remain untouched)')
+        await new Promise(r => setTimeout(r, 800))
+        setIsGenerating(false)
+        onCompleted()
+        return
+      }
+
       // Step 5 validation: Name, AI Name, and Main Goal are required!
       const missing: string[] = []
       if (!answers.name.trim()) missing.push('Your Name')
@@ -185,6 +198,46 @@ export default function OnboardingWizard({ onCompleted }: OnboardingWizardProps)
           </div>
         ) : (
           <>
+            {isDemo && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 12,
+                  left: 12,
+                  right: 12,
+                  zIndex: 50,
+                  background: 'rgba(15, 23, 42, 0.85)',
+                  backdropFilter: 'blur(8px)',
+                  color: '#FCD34D',
+                  border: '1px solid rgba(245, 158, 11, 0.4)',
+                  padding: '8px 12px',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                }}
+              >
+                <span>✨ DEMO PREVIEW MODE · Safe Walkthrough</span>
+                <button
+                  onClick={onCompleted}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.15)',
+                    border: 'none',
+                    color: '#FFFFFF',
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '10.5px',
+                    fontWeight: 700,
+                  }}
+                >
+                  Close Demo ✕
+                </button>
+              </div>
+            )}
+
             {/* ── SLIDE 1: SMART AI COMPANION ─────────────────────────── */}
             {step === 1 && (
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }} className="fade-in-up">

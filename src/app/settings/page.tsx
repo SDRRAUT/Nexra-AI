@@ -5,6 +5,7 @@ import AppHeader from '@/components/layout/AppHeader'
 import BottomNav from '@/components/layout/BottomNav'
 import { useRouter } from 'next/navigation'
 import { localDb } from '@/lib/db/localDb'
+import OnboardingWizard from '@/components/onboarding/OnboardingWizard'
 
 interface Settings {
   name: string
@@ -44,6 +45,7 @@ export default function SettingsPage() {
   })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [showDemoOnboarding, setShowDemoOnboarding] = useState(false)
 
   // API Key State
   const [apiKeyStatus, setApiKeyStatus] = useState<{ hasKey: boolean; maskedKey: string }>({
@@ -403,11 +405,7 @@ export default function SettingsPage() {
   }
 
   const handleReplayOnboarding = () => {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem('nexra_onboarding_done')
-      localStorage.removeItem('srushti_onboarding_done')
-    }
-    window.location.href = '/'
+    setShowDemoOnboarding(true)
   }
 
   const ToggleSwitch = ({ checked, onChange }: { checked: boolean; onChange: (c: boolean) => void }) => (
@@ -931,6 +929,14 @@ export default function SettingsPage() {
       </div>
 
       <BottomNav />
+
+      {/* ── SAFE DEMO WALKTHROUGH PREVIEW ── */}
+      {showDemoOnboarding && (
+        <OnboardingWizard
+          isDemo={true}
+          onCompleted={() => setShowDemoOnboarding(false)}
+        />
+      )}
     </div>
   )
 }

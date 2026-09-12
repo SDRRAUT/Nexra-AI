@@ -94,6 +94,8 @@ function notifyDataChanged() {
   }
 }
 
+import { scheduleTaskReminder, syncAllActiveReminders } from '@/lib/notifications/native'
+
 // ── 2. TASKS CRUD ─────────────────────────────────────────────
 export async function getClientTasks(): Promise<LocalTask[]> {
   await ensureInitialData()
@@ -113,12 +115,17 @@ export async function createClientTask(task: Partial<LocalTask>): Promise<LocalT
     ...task,
   }
   await localDb.tasks.add(newTask)
+  scheduleTaskReminder(newTask).catch(() => {})
   notifyDataChanged()
   return newTask
 }
 
 export async function updateClientTask(id: string, updates: Partial<LocalTask>): Promise<void> {
   await localDb.tasks.update(id, updates)
+  const updated = await localDb.tasks.get(id)
+  if (updated) {
+    scheduleTaskReminder(updated).catch(() => {})
+  }
   notifyDataChanged()
 }
 
@@ -212,10 +219,21 @@ export async function toggleClientHabit(id: string, completed: boolean, dateStr?
   const habit = await localDb.habits.get(id)
   if (!habit) return
 
-  const targetDate = dateStr || new Date().toISOString().split('T')[0]
+  const now = new Date()
+  const localY = now.getFullYear()
+  const localM = String(now.getMonth() + 1).padStart(2, '0')
+  const localD = String(now.getDate()).padStart(2, '0')
+  const defaultToday = `${localY}-${localM}-${localD}`
+  const targetDate = dateStr || defaultToday
 
   if (completed) {
-    const existing = await localDb.habitLogs.where('habitId').equals(id).filter(l => l.date === targetDate).first().catch(() => null)
+    const existing = await localDb.habitLogs
+      .where('habitId')
+      .equals(id)
+      .filter(l => l.date === targetDate)
+      .first()
+      .catch(() => null)
+
     if (!existing) {
       await localDb.habitLogs.add({
         id: `hlog-${id}-${targetDate}-${Date.now()}`,
@@ -226,15 +244,42 @@ export async function toggleClientHabit(id: string, completed: boolean, dateStr?
       }).catch(() => {})
     }
   } else {
-    await localDb.habitLogs.where('habitId').equals(id).filter(l => l.date === targetDate).delete().catch(() => {})
+    await localDb.habitLogs
+      .where('habitId')
+      .equals(id)
+      .filter(l => l.date === targetDate)
+      .delete()
+      .catch(() => {})
   }
 
-  const newStreak = completed ? habit.currentStreak + 1 : Math.max(0, habit.currentStreak - 1)
-  const newLongest = Math.max(habit.longestStreak, newStreak)
-  const newTotal = completed ? habit.totalCompleted + 1 : Math.max(0, habit.totalCompleted - 1)
+  // Calculate actual streak accurately from all completed logs
+  const allLogs = await localDb.habitLogs.where('habitId').equals(id).toArray().catch(() => [])
+  const completedDates = new Set(allLogs.filter(l => l.status === 'completed').map(l => l.date))
+
+  let streak = 0
+  const cur = new Date()
+  const getFmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const todayFmt = getFmt(cur)
+
+  if (completedDates.has(todayFmt)) {
+    while (completedDates.has(getFmt(cur))) {
+      streak++
+      cur.setDate(cur.getDate() - 1)
+    }
+  } else {
+    // Check if yesterday was completed
+    cur.setDate(cur.getDate() - 1)
+    while (completedDates.has(getFmt(cur))) {
+      streak++
+      cur.setDate(cur.getDate() - 1)
+    }
+  }
+
+  const newTotal = completedDates.size
+  const newLongest = Math.max(habit.longestStreak || 0, streak)
 
   await localDb.habits.update(id, {
-    currentStreak: newStreak,
+    currentStreak: streak,
     longestStreak: newLongest,
     totalCompleted: newTotal,
   })

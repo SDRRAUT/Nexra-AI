@@ -1,17 +1,25 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import AppHeader from '@/components/layout/AppHeader'
 import BottomNav from '@/components/layout/BottomNav'
 import { format, subDays, isSameDay } from 'date-fns'
 import {
   getClientHabits,
+  getClientHabitLogs,
   toggleClientHabit,
   createClientHabit,
   updateClientHabit,
   deleteClientHabit,
 } from '@/lib/data/clientData'
+
+interface HabitLog {
+  id: string
+  habitId?: string
+  date: string
+  status: string
+}
 
 interface Habit {
   id: string
@@ -22,13 +30,8 @@ interface Habit {
   currentStreak: number
   longestStreak: number
   totalCompleted: number
+  category?: string
   logs: HabitLog[]
-}
-
-interface HabitLog {
-  id: string
-  date: string
-  status: string
 }
 
 export default function HabitsPage() {
@@ -44,36 +47,64 @@ export default function HabitsPage() {
     title: '',
     frequency: 'daily',
     scheduledTime: '08:00',
-    category: 'health',
+    category: 'productivity',
   })
 
-  const todayStr = format(new Date(), 'yyyy-MM-dd')
-  const last7Days = Array.from({ length: 7 }, (_, i) => subDays(new Date(), 6 - i))
+  const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), [])
+  const last7Days = useMemo(() => Array.from({ length: 7 }, (_, i) => subDays(new Date(), 6 - i)), [])
 
   const fetchHabits = async () => {
     try {
-      // 1. Try local offline data first
-      const localHabits = await getClientHabits()
-      if (localHabits) {
-        setHabits(localHabits as any)
-      }
-
-      // 2. Also try API if server is running
-      const [hRes, lRes] = await Promise.all([
-        fetch('/api/habits').then(r => r.json()).catch(() => null),
-        fetch(`/api/habits/logs?date=${todayStr}`).then(r => r.json()).catch(() => null),
+      // 1. Fetch offline-first data from IndexedDB
+      const [localHabits, localLogs] = await Promise.all([
+        getClientHabits(),
+        getClientHabitLogs(),
       ])
 
-      if (Array.isArray(hRes)) setHabits(hRes)
-
       const logMap: Record<string, string> = {}
-      if (Array.isArray(lRes)) {
-        lRes.forEach((l: HabitLog) => {
-          logMap[l.date] = l.status
+      if (Array.isArray(localLogs)) {
+        localLogs.forEach((l: any) => {
+          if (l.date === todayStr && l.habitId) {
+            logMap[l.habitId] = l.status
+          }
         })
       }
       setTodayLogs(logMap)
-    } catch {
+
+      const habitsWithLogs: Habit[] = (localHabits || []).map(h => ({
+        ...h,
+        logs: (localLogs || []).filter(l => l.habitId === h.id),
+      }))
+      setHabits(habitsWithLogs)
+
+      // 2. Sync with backend API if available
+      try {
+        const [hRes, lRes] = await Promise.all([
+          fetch('/api/habits').then(r => r.ok ? r.json() : null).catch(() => null),
+          fetch(`/api/habits/logs?date=${todayStr}`).then(r => r.ok ? r.json() : null).catch(() => null),
+        ])
+
+        if (Array.isArray(hRes) && hRes.length > 0) {
+          setHabits(prev => hRes.map(h => {
+            const matched = prev.find(p => p.id === h.id)
+            return {
+              ...h,
+              logs: matched?.logs || h.logs || [],
+            }
+          }))
+        }
+
+        if (Array.isArray(lRes) && lRes.length > 0) {
+          lRes.forEach((l: any) => {
+            if (l.habitId) {
+              logMap[l.habitId] = l.status
+            }
+          })
+          setTodayLogs({ ...logMap })
+        }
+      } catch {}
+    } catch (e) {
+      console.error('Error loading habits:', e)
     } finally {
       setLoading(false)
     }
@@ -88,20 +119,50 @@ export default function HabitsPage() {
     return () => window.removeEventListener('srushti_data_changed', handleDataChanged)
   }, [])
 
-  const toggleHabit = async (habitId: string) => {
-    const current = todayLogs[habitId]
-    const isNowCompleted = current !== 'completed'
+  const toggleHabit = async (habitId: string, specificDate?: string) => {
+    const targetDate = specificDate || todayStr
+    const isToday = targetDate === todayStr
+
+    const currentStatus = isToday
+      ? todayLogs[habitId]
+      : habits.find(h => h.id === habitId)?.logs?.find(l => l.date === targetDate)?.status
+
+    const isNowCompleted = currentStatus !== 'completed'
     const newStatus = isNowCompleted ? 'completed' : 'skipped'
 
-    setTodayLogs(prev => ({ ...prev, [habitId]: newStatus }))
-    await toggleClientHabit(habitId, isNowCompleted).catch(() => {})
+    // Optimistic UI update immediately
+    if (isToday) {
+      setTodayLogs(prev => ({ ...prev, [habitId]: newStatus }))
+    }
 
-    await fetch('/api/habits/logs', {
+    setHabits(prev => prev.map(h => {
+      if (h.id !== habitId) return h
+      const currentLogs = h.logs || []
+      const filteredLogs = currentLogs.filter(l => l.date !== targetDate)
+      const updatedLogs = isNowCompleted
+        ? [...filteredLogs, { id: `log-${Date.now()}`, habitId, date: targetDate, status: 'completed' }]
+        : filteredLogs
+
+      const streakDelta = isNowCompleted ? 1 : -1
+      const newStreak = Math.max(0, (h.currentStreak || 0) + streakDelta)
+
+      return {
+        ...h,
+        currentStreak: newStreak,
+        logs: updatedLogs,
+      }
+    }))
+
+    // Persist to local IndexedDB
+    await toggleClientHabit(habitId, isNowCompleted, targetDate).catch(() => {})
+
+    // Optional sync to backend
+    fetch('/api/habits/logs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         habitId,
-        date: todayStr,
+        date: targetDate,
         status: newStatus,
       }),
     }).catch(() => {})
@@ -138,44 +199,47 @@ export default function HabitsPage() {
   const handleAddHabit = async () => {
     if (!newHabit.title.trim()) return
     await createClientHabit(newHabit).catch(() => {})
-    await fetch('/api/habits', {
+    fetch('/api/habits', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newHabit),
     }).catch(() => {})
-    setNewHabit({ title: '', frequency: 'daily', scheduledTime: '08:00', category: 'health' })
+    setNewHabit({ title: '', frequency: 'daily', scheduledTime: '08:00', category: 'productivity' })
     setShowAdd(false)
     fetchHabits()
   }
 
   const completedTodayCount = habits.filter(h => todayLogs[h.id] === 'completed').length
+  const progressPercent = habits.length > 0 ? Math.round((completedTodayCount / habits.length) * 100) : 0
 
   return (
     <div className="app-shell">
       <AppHeader />
 
-      <div className="page-content">
-        <div className="page-section" style={{ marginTop: 'var(--space-4)' }}>
+      <div className="page-content" style={{ paddingBottom: '95px' }}>
+        <div className="page-section" style={{ marginTop: 'var(--space-3)' }}>
 
           {/* ── HERO HABITS OVERVIEW ─────────────────────────── */}
           <div
             className="card fade-in-up"
             style={{
-              padding: 'var(--space-5)',
+              padding: '16px 18px',
               background: 'linear-gradient(135deg, var(--bg-surface), var(--bg-subtle))',
               border: '1px solid var(--border-default)',
-              marginBottom: 'var(--space-5)',
+              borderRadius: '20px',
+              marginBottom: 'var(--space-4)',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--brand-accent)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                <div style={{ fontSize: '10.5px', fontWeight: 800, color: 'var(--brand-accent, #10B981)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
                   DAILY CONSISTENCY
                 </div>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 800, color: 'var(--text-primary)' }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)', marginTop: 2 }}>
                   Habits & Streaks
                 </div>
-                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginTop: 2 }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: 3 }}>
                   {completedTodayCount} of {habits.length} routines completed today
                 </div>
               </div>
@@ -183,20 +247,23 @@ export default function HabitsPage() {
               <button
                 className="btn btn-primary btn-sm"
                 onClick={() => setShowAdd(true)}
-                style={{ fontSize: '12px', padding: '6px 14px' }}
+                style={{ fontSize: '12px', padding: '7px 14px', borderRadius: '12px', fontWeight: 700 }}
+                id="add-new-habit-btn"
               >
                 + New Habit
               </button>
             </div>
 
             {/* Habit Completion Progress */}
-            <div style={{ marginTop: 'var(--space-4)' }}>
-              <div className="progress-container" style={{ height: 8, borderRadius: 6 }}>
+            <div style={{ marginTop: '14px' }}>
+              <div className="progress-container" style={{ height: 8, borderRadius: 999, background: 'var(--bg-muted)' }}>
                 <div
                   className="progress-bar"
                   style={{
-                    width: `${habits.length > 0 ? (completedTodayCount / habits.length) * 100 : 0}%`,
-                    background: 'linear-gradient(90deg, var(--brand-accent), #34D399)',
+                    width: `${progressPercent}%`,
+                    background: 'linear-gradient(90deg, #10B981, #34D399)',
+                    borderRadius: 999,
+                    transition: 'width 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
                   }}
                 />
               </div>
@@ -206,23 +273,23 @@ export default function HabitsPage() {
           {/* ── HABITS LIST ─────────────────────────── */}
           {loading && (
             <>
-              <div className="skeleton" style={{ height: 100, borderRadius: 20, marginBottom: 12 }} />
-              <div className="skeleton" style={{ height: 100, borderRadius: 20 }} />
+              <div className="skeleton" style={{ height: 110, borderRadius: 20, marginBottom: 12 }} />
+              <div className="skeleton" style={{ height: 110, borderRadius: 20 }} />
             </>
           )}
 
           {!loading && habits.length === 0 && (
-            <div className="card fade-in-up">
-              <div className="empty-state" style={{ padding: 'var(--space-8) var(--space-4)' }}>
-                <div className="empty-icon">🔁</div>
-                <div className="empty-title">No habits tracked yet</div>
-                <div className="empty-sub">
-                  Build unbreakable momentum. Add your morning routines, study habits, and fitness goals.
+            <div className="card fade-in-up" style={{ borderRadius: 20 }}>
+              <div className="empty-state" style={{ padding: '36px 16px', textAlign: 'center' }}>
+                <div className="empty-icon" style={{ fontSize: 36, marginBottom: 8 }}>🔁</div>
+                <div className="empty-title" style={{ fontSize: 16, fontWeight: 700 }}>No habits tracked yet</div>
+                <div className="empty-sub" style={{ fontSize: 12, color: 'var(--text-tertiary)', maxWidth: 300, margin: '6px auto 0' }}>
+                  Build consistent momentum. Add morning routines, workout habits, or study focus rituals.
                 </div>
                 <button
                   className="btn btn-primary btn-sm"
                   onClick={() => setShowAdd(true)}
-                  style={{ marginTop: 'var(--space-4)' }}
+                  style={{ marginTop: 14, borderRadius: 12, padding: '8px 16px' }}
                 >
                   + Add First Habit
                 </button>
@@ -230,7 +297,7 @@ export default function HabitsPage() {
             </div>
           )}
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginBottom: 'var(--space-6)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: 'var(--space-6)' }}>
             {habits.map(habit => {
               const isCompleted = todayLogs[habit.id] === 'completed'
               return (
@@ -238,77 +305,100 @@ export default function HabitsPage() {
                   key={habit.id}
                   className="card fade-in-up"
                   style={{
-                    border: `1px solid var(--border-default)`,
+                    border: `1px solid ${isCompleted ? 'rgba(16, 185, 129, 0.3)' : 'var(--border-default)'}`,
+                    borderRadius: '20px',
+                    boxShadow: isCompleted ? '0 4px 18px rgba(16, 185, 129, 0.08)' : '0 2px 10px rgba(0, 0, 0, 0.03)',
                     transition: 'all var(--transition-fast)',
+                    background: 'var(--bg-surface)',
                   }}
                 >
-                  <div style={{ padding: 'var(--space-4) var(--space-5)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flex: 1 }}>
+                  <div style={{ padding: '14px 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
+                        {/* Circular Checkbox Toggle */}
                         <div
                           onClick={() => toggleHabit(habit.id)}
+                          title={isCompleted ? 'Mark uncompleted' : 'Mark completed today'}
                           style={{
                             width: 38,
                             height: 38,
-                            borderRadius: 'var(--radius-full)',
-                            background: isCompleted ? 'var(--brand-accent)' : 'var(--bg-subtle)',
-                            color: isCompleted ? 'white' : 'var(--text-tertiary)',
-                            border: `2px solid ${isCompleted ? 'var(--brand-accent)' : 'var(--border-default)'}`,
+                            borderRadius: '50%',
+                            background: isCompleted ? 'linear-gradient(135deg, #10B981, #059669)' : 'var(--bg-subtle)',
+                            color: '#FFFFFF',
+                            border: `2px solid ${isCompleted ? '#10B981' : 'var(--border-default)'}`,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             fontSize: 16,
-                            fontWeight: 800,
+                            fontWeight: 900,
                             cursor: 'pointer',
-                            transition: 'all var(--transition-spring)',
-                            boxShadow: isCompleted ? '0 4px 12px rgba(16, 185, 129, 0.35)' : 'none',
+                            flexShrink: 0,
+                            transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                            boxShadow: isCompleted ? '0 4px 14px rgba(16, 185, 129, 0.35)' : 'none',
                           }}
                         >
                           {isCompleted ? '✓' : ''}
                         </div>
 
-                        <div>
+                        {/* Title & Timing Info */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{
                             fontFamily: 'var(--font-display)',
-                            fontSize: 'var(--text-base)',
+                            fontSize: '14.5px',
                             fontWeight: 700,
                             color: 'var(--text-primary)',
                             textDecoration: isCompleted ? 'line-through' : 'none',
-                            opacity: isCompleted ? 0.75 : 1,
+                            opacity: isCompleted ? 0.7 : 1,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            transition: 'all 0.2s ease',
                           }}>
                             {habit.title}
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 2 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
                             {habit.scheduledTime && (
-                              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
+                              <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: 2 }}>
                                 ⏰ {habit.scheduledTime}
                               </span>
                             )}
-                            <span className="badge badge-info" style={{ textTransform: 'capitalize' }}>
+                            <span
+                              style={{
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                textTransform: 'capitalize',
+                                padding: '1px 6px',
+                                borderRadius: 6,
+                                background: 'rgba(99, 102, 241, 0.08)',
+                                color: 'var(--brand-primary, #6366F1)',
+                              }}
+                            >
                               {habit.frequency}
                             </span>
                           </div>
                         </div>
                       </div>
 
+                      {/* Right Actions: Streak & Options Menu */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }}>
                         {/* Streak Badge */}
                         <div
+                          title={`${habit.currentStreak} day streak`}
                           style={{
                             display: 'flex',
                             alignItems: 'center',
                             gap: 4,
                             background: habit.currentStreak > 0 ? 'rgba(245, 158, 11, 0.12)' : 'var(--bg-subtle)',
-                            padding: '4px 10px',
-                            borderRadius: 'var(--radius-full)',
-                            border: `1px solid ${habit.currentStreak > 0 ? 'rgba(245, 158, 11, 0.25)' : 'var(--border-subtle)'}`,
+                            padding: '3px 8px',
+                            borderRadius: '999px',
+                            border: `1px solid ${habit.currentStreak > 0 ? 'rgba(245, 158, 11, 0.3)' : 'var(--border-subtle)'}`,
                           }}
                         >
-                          <span style={{ fontSize: 14 }}>🔥</span>
+                          <span style={{ fontSize: 13 }}>🔥</span>
                           <span style={{
-                            fontSize: 'var(--text-xs)',
+                            fontSize: '11px',
                             fontWeight: 800,
-                            color: habit.currentStreak > 0 ? 'var(--brand-warm)' : 'var(--text-tertiary)',
+                            color: habit.currentStreak > 0 ? '#D97706' : 'var(--text-tertiary)',
                           }}>
                             {habit.currentStreak}d
                           </span>
@@ -324,11 +414,11 @@ export default function HabitsPage() {
                           style={{
                             width: 28,
                             height: 28,
-                            borderRadius: 'var(--radius-full)',
+                            borderRadius: '50%',
                             border: '1px solid var(--border-default)',
                             background: 'var(--bg-subtle)',
                             color: 'var(--text-primary)',
-                            fontSize: '16px',
+                            fontSize: '15px',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -338,6 +428,7 @@ export default function HabitsPage() {
                           ⋮
                         </button>
 
+                        {/* Context Menu Dropdown */}
                         {activeMenuHabitId === habit.id && (
                           <div
                             className="card fade-in-up"
@@ -345,10 +436,10 @@ export default function HabitsPage() {
                               position: 'absolute',
                               top: 'calc(100% + 4px)',
                               right: 0,
-                              zIndex: 50,
+                              zIndex: 100,
                               minWidth: 130,
                               padding: 4,
-                              borderRadius: 'var(--radius-lg)',
+                              borderRadius: '12px',
                               boxShadow: 'var(--shadow-xl)',
                               background: 'var(--bg-surface)',
                               border: '1px solid var(--border-default)',
@@ -363,18 +454,18 @@ export default function HabitsPage() {
                               }}
                               style={{
                                 width: '100%',
-                                padding: '8px 10px',
+                                padding: '7px 10px',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: 6,
                                 border: 'none',
                                 background: 'transparent',
                                 color: 'var(--text-primary)',
-                                fontSize: '12px',
+                                fontSize: '11.5px',
                                 fontWeight: 600,
                                 cursor: 'pointer',
                                 textAlign: 'left',
-                                borderRadius: 'var(--radius-md)',
+                                borderRadius: '8px',
                               }}
                             >
                               <span>✏️</span>
@@ -390,18 +481,18 @@ export default function HabitsPage() {
                               }}
                               style={{
                                 width: '100%',
-                                padding: '8px 10px',
+                                padding: '7px 10px',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: 6,
                                 border: 'none',
                                 background: 'transparent',
-                                color: 'var(--status-error, #EF4444)',
-                                fontSize: '12px',
+                                color: '#EF4444',
+                                fontSize: '11.5px',
                                 fontWeight: 600,
                                 cursor: 'pointer',
                                 textAlign: 'left',
-                                borderRadius: 'var(--radius-md)',
+                                borderRadius: '8px',
                               }}
                             >
                               <span>🗑️</span>
@@ -412,44 +503,51 @@ export default function HabitsPage() {
                       </div>
                     </div>
 
-                    {/* 7-Day Matrix Dots */}
+                    {/* 7-Day Matrix Dots (Past 7 Days) */}
                     <div
                       style={{
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        marginTop: 'var(--space-3)',
-                        paddingTop: 'var(--space-3)',
+                        marginTop: '12px',
+                        paddingTop: '10px',
                         borderTop: '1px solid var(--border-subtle)',
                       }}
                     >
-                      <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>
+                      <span style={{ fontSize: '9.5px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
                         Past 7 Days
                       </span>
                       <div style={{ display: 'flex', gap: 6 }}>
                         {last7Days.map((d, i) => {
-                          const isT = isSameDay(d, new Date())
+                          const isToday = isSameDay(d, new Date())
                           const dStr = format(d, 'yyyy-MM-dd')
-                          const isDone = isT ? isCompleted : habit.logs?.some(l => l.date === dStr && l.status === 'completed')
+                          const isDone = habit.logs?.some(l => l.date === dStr && l.status === 'completed') || (isToday && isCompleted)
                           return (
                             <div
                               key={i}
-                              title={format(d, 'EEE, MMM d')}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                toggleHabit(habit.id, dStr)
+                              }}
+                              title={`${format(d, 'EEE, MMM d')}: ${isDone ? 'Completed (click to toggle)' : 'Not done (click to toggle)'}`}
                               style={{
-                                width: 22,
-                                height: 22,
-                                borderRadius: 'var(--radius-full)',
-                                background: isDone ? 'var(--brand-accent)' : 'var(--bg-muted)',
-                                color: isDone ? 'white' : 'var(--text-tertiary)',
+                                width: 24,
+                                height: 24,
+                                borderRadius: '50%',
+                                background: isDone ? '#10B981' : 'var(--bg-muted)',
+                                color: isDone ? '#FFFFFF' : 'var(--text-tertiary)',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                fontSize: '9px',
-                                fontWeight: 700,
-                                border: isT ? '1.5px solid var(--brand-primary)' : 'none',
+                                fontSize: '9.5px',
+                                fontWeight: 800,
+                                border: isToday ? '1.5px solid var(--brand-primary, #6366F1)' : '1px solid transparent',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease',
+                                transform: isToday ? 'scale(1.06)' : 'scale(1)',
                               }}
                             >
-                              {format(d, 'EEEEE')}
+                              {isDone ? '✓' : format(d, 'EEEEE')}
                             </div>
                           )
                         })}
@@ -470,18 +568,31 @@ export default function HabitsPage() {
           <div className="sheet-overlay" onClick={() => setShowAdd(false)} />
           <div className="bottom-sheet">
             <div className="sheet-handle" />
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 700, marginBottom: 'var(--space-4)' }}>
-              Add Habit Routine
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '18px', fontWeight: 800 }}>
+                Add Habit Routine
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAdd(false)}
+                style={{ border: 'none', background: 'none', fontSize: 18, color: 'var(--text-tertiary)', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
               <div className="input-group">
                 <label className="input-label">Habit Title</label>
                 <input
                   className="input"
-                  placeholder="e.g. Read 20 pages, Code 45 mins, Morning Workout..."
+                  placeholder="e.g. Read 20 pages, Morning Workout, Meditate 10m..."
                   value={newHabit.title}
                   onChange={e => setNewHabit(p => ({ ...p, title: e.target.value }))}
                   autoFocus
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleAddHabit()
+                  }}
                 />
               </div>
 
@@ -500,10 +611,11 @@ export default function HabitsPage() {
                         fontSize: 'var(--text-xs)',
                         fontWeight: 700,
                         textTransform: 'capitalize',
-                        background: newHabit.frequency === f ? 'var(--brand-primary)' : 'var(--bg-muted)',
+                        background: newHabit.frequency === f ? 'var(--brand-primary, #6366F1)' : 'var(--bg-muted)',
                         color: newHabit.frequency === f ? 'white' : 'var(--text-secondary)',
                         border: 'none',
                         cursor: 'pointer',
+                        transition: 'all 0.15s ease',
                       }}
                     >
                       {f}
@@ -522,7 +634,12 @@ export default function HabitsPage() {
                 />
               </div>
 
-              <button className="btn btn-primary btn-full" onClick={handleAddHabit}>
+              <button
+                className="btn btn-primary btn-full"
+                onClick={handleAddHabit}
+                disabled={!newHabit.title.trim()}
+                style={{ marginTop: 4, padding: '11px', borderRadius: 12, fontWeight: 700 }}
+              >
                 Start Habit Streak
               </button>
             </div>
@@ -537,7 +654,7 @@ export default function HabitsPage() {
           <div className="bottom-sheet">
             <div className="sheet-handle" />
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)' }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 700 }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '18px', fontWeight: 800 }}>
                 ✏️ Edit Habit
               </div>
               <button
@@ -549,7 +666,7 @@ export default function HabitsPage() {
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
               <div className="input-group">
                 <label className="input-label">Habit Title</label>
                 <input
@@ -557,6 +674,9 @@ export default function HabitsPage() {
                   value={editingHabit.title || ''}
                   onChange={e => setEditingHabit((p: any) => ({ ...p, title: e.target.value }))}
                   autoFocus
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleSaveEditHabit()
+                  }}
                 />
               </div>
 
@@ -575,10 +695,11 @@ export default function HabitsPage() {
                         fontSize: 'var(--text-xs)',
                         fontWeight: 700,
                         textTransform: 'capitalize',
-                        background: editingHabit.frequency === f ? 'var(--brand-primary)' : 'var(--bg-muted)',
+                        background: editingHabit.frequency === f ? 'var(--brand-primary, #6366F1)' : 'var(--bg-muted)',
                         color: editingHabit.frequency === f ? 'white' : 'var(--text-secondary)',
                         border: 'none',
                         cursor: 'pointer',
+                        transition: 'all 0.15s ease',
                       }}
                     >
                       {f}
@@ -597,11 +718,11 @@ export default function HabitsPage() {
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 4 }}>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 6 }}>
                 <button
                   type="button"
                   className="btn btn-secondary"
-                  style={{ flex: 1 }}
+                  style={{ flex: 1, borderRadius: 12 }}
                   onClick={() => setEditingHabit(null)}
                 >
                   Cancel
@@ -609,10 +730,11 @@ export default function HabitsPage() {
                 <button
                   type="button"
                   className="btn btn-primary"
-                  style={{ flex: 2 }}
+                  style={{ flex: 2, borderRadius: 12, fontWeight: 700 }}
                   onClick={handleSaveEditHabit}
+                  disabled={!editingHabit.title?.trim()}
                 >
-                  💾 Save Changes
+                  Save Changes
                 </button>
               </div>
             </div>

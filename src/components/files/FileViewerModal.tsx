@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { LocalDocument, localDb } from '@/lib/db/localDb'
 
@@ -22,6 +22,36 @@ export default function FileViewerModal({
   const router = useRouter()
   const [copied, setCopied] = useState(false)
   const [deleting, setDeleting] = useState(false)
+
+  const isPdf = doc ? (doc.type === 'pdf' || (doc.mimeType && doc.mimeType.includes('pdf'))) : false
+
+  // Generate safe Blob URL for PDF rendering
+  const pdfBlobUrl = useMemo(() => {
+    if (!doc || !isPdf || !doc.dataUrl) return null
+    try {
+      const parts = doc.dataUrl.split(',')
+      const base64 = parts[1] || parts[0]
+      const byteCharacters = atob(base64)
+      const byteNumbers = new Array(byteCharacters.length)
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i)
+      }
+      const byteArray = new Uint8Array(byteNumbers)
+      const blob = new Blob([byteArray], { type: 'application/pdf' })
+      return URL.createObjectURL(blob)
+    } catch (e) {
+      console.error('Error generating PDF blob URL:', e)
+      return doc.dataUrl
+    }
+  }, [doc, isPdf])
+
+  useEffect(() => {
+    return () => {
+      if (pdfBlobUrl && pdfBlobUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(pdfBlobUrl)
+      }
+    }
+  }, [pdfBlobUrl])
 
   if (!isOpen || !doc) return null
 
@@ -47,12 +77,20 @@ export default function FileViewerModal({
     router.push('/chat')
   }
 
+  const handleOpenPdfExternal = () => {
+    const targetUrl = pdfBlobUrl || doc.dataUrl
+    if (targetUrl) {
+      window.open(targetUrl, '_blank')
+    }
+  }
+
   const handleDownload = () => {
     try {
-      if (doc.dataUrl) {
+      const href = pdfBlobUrl || doc.dataUrl
+      if (href) {
         const a = document.createElement('a')
-        a.href = doc.dataUrl
-        a.download = doc.title
+        a.href = href
+        a.download = doc.title.toLowerCase().endsWith('.pdf') ? doc.title : `${doc.title}.pdf`
         document.body.appendChild(a)
         a.click()
         document.body.removeChild(a)
@@ -106,7 +144,6 @@ export default function FileViewerModal({
   }
 
   const isImage = doc.type === 'image' || (doc.mimeType && doc.mimeType.startsWith('image/'))
-  const isPdf = doc.type === 'pdf' || (doc.mimeType && doc.mimeType.includes('pdf'))
   const isCode = doc.type === 'code'
 
   return (
@@ -238,34 +275,102 @@ export default function FileViewerModal({
             </div>
           )}
 
-          {/* PDF Viewer / Attachment Box */}
+          {/* PDF Viewer & In-App Embedded Frame */}
           {isPdf && (
-            <div
-              style={{
-                background: 'rgba(239, 68, 68, 0.06)',
-                border: '1px solid rgba(239, 68, 68, 0.2)',
-                borderRadius: 'var(--radius-lg)',
-                padding: 'var(--space-5)',
-                textAlign: 'center',
-                marginBottom: 'var(--space-4)',
-              }}
-            >
-              <div style={{ fontSize: 44, marginBottom: 8 }}>📑</div>
-              <div style={{ fontWeight: 700, fontSize: 'var(--text-base)', color: 'var(--text-primary)' }}>
-                {doc.title}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+              {/* PDF Action Bar */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '10px 14px',
+                  background: 'var(--bg-subtle)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-subtle)',
+                  flexWrap: 'wrap',
+                  gap: 8,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 20 }}>📑</span>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      PDF Reader
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                      {formatFileSize(doc.size) || 'Document'}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={handleOpenPdfExternal}
+                    style={{ fontSize: '11.5px', padding: '5px 12px', display: 'flex', alignItems: 'center', gap: 4, borderRadius: 8 }}
+                    title="Open in full screen or external viewer"
+                  >
+                    <span>🚀</span> Fullscreen
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={handleDownload}
+                    style={{ fontSize: '11.5px', padding: '5px 12px', display: 'flex', alignItems: 'center', gap: 4, borderRadius: 8 }}
+                    title="Save PDF"
+                  >
+                    <span>⬇️</span> Download
+                  </button>
+                </div>
               </div>
-              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginTop: 4 }}>
-                PDF Document · {formatFileSize(doc.size)}
-              </div>
-              {doc.dataUrl && (
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  onClick={handleDownload}
-                  style={{ marginTop: 'var(--space-4)' }}
+
+              {/* In-App Embedded Frame */}
+              {pdfBlobUrl ? (
+                <div
+                  style={{
+                    width: '100%',
+                    height: '480px',
+                    borderRadius: 'var(--radius-lg)',
+                    overflow: 'hidden',
+                    border: '1px solid var(--border-default)',
+                    background: '#334155',
+                    position: 'relative',
+                  }}
                 >
-                  📥 Open / Download PDF
-                </button>
+                  <iframe
+                    src={`${pdfBlobUrl}#toolbar=1&navpanes=0`}
+                    style={{ width: '100%', height: '100%', border: 'none' }}
+                    title={doc.title}
+                  />
+                </div>
+              ) : (
+                <div
+                  style={{
+                    background: 'rgba(239, 68, 68, 0.06)',
+                    border: '1px solid rgba(239, 68, 68, 0.2)',
+                    borderRadius: 'var(--radius-lg)',
+                    padding: 'var(--space-6)',
+                    textAlign: 'center',
+                  }}
+                >
+                  <div style={{ fontSize: 44, marginBottom: 8 }}>📑</div>
+                  <div style={{ fontWeight: 700, fontSize: 'var(--text-base)', color: 'var(--text-primary)' }}>
+                    {doc.title}
+                  </div>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginTop: 4 }}>
+                    PDF Document · {formatFileSize(doc.size)}
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={handleOpenPdfExternal}
+                    style={{ marginTop: 'var(--space-4)' }}
+                  >
+                    🚀 Open PDF Document
+                  </button>
+                </div>
               )}
             </div>
           )}

@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation'
 import AppHeader from '@/components/layout/AppHeader'
 import BottomNav from '@/components/layout/BottomNav'
 import { format } from 'date-fns'
-import FocusTimerCard from '@/components/dashboard/FocusTimerCard'
-import { scheduleDailyMorningBriefing, requestNotificationPermission } from '@/lib/notifications/native'
+import { scheduleDailyMorningBriefing, requestNotificationPermission, syncAllActiveReminders } from '@/lib/notifications/native'
 
 interface DashboardData {
   user: { name: string; timezone: string; setupDone?: boolean }
@@ -56,12 +55,13 @@ interface BriefingData {
   missedTasks: Task[]
 }
 
-function getGreeting(name: string): { text: string; emoji: string } {
+function getGreeting(name: string, title: string = 'Sir'): { text: string; emoji: string } {
   const h = new Date().getHours()
-  if (h < 12) return { text: `Good morning, ${name}`, emoji: '☀️' }
-  if (h < 17) return { text: `Good afternoon, ${name}`, emoji: '👋' }
-  if (h < 21) return { text: `Good evening, ${name}`, emoji: '🌆' }
-  return { text: `Hey ${name}`, emoji: '🌙' }
+  const salutation = name && name !== 'User' && name !== 'Friend' ? `${name} ${title}` : title
+  if (h < 12) return { text: `Good morning, ${salutation}`, emoji: '☀️' }
+  if (h < 17) return { text: `Good afternoon, ${salutation}`, emoji: '👋' }
+  if (h < 21) return { text: `Good evening, ${salutation}`, emoji: '🌆' }
+  return { text: `Hey ${salutation}`, emoji: '🌙' }
 }
 
 const priorityColors: Record<string, string> = {
@@ -89,6 +89,7 @@ import OnboardingWizard from '@/components/onboarding/OnboardingWizard'
 import FocusCompanionModal from '@/components/focus/FocusCompanionModal'
 import ScheduleOptimizerModal from '@/components/calendar/ScheduleOptimizerModal'
 import ExamDeconstructionWizard from '@/components/study/ExamDeconstructionWizard'
+import AssistantBriefingModal from '@/components/dashboard/AssistantBriefingModal'
 
 export default function HomePage() {
   const router = useRouter()
@@ -102,6 +103,8 @@ export default function HomePage() {
   const [recoveringTaskId, setRecoveringTaskId] = useState<string | null>(null)
 
   // Next-Gen Modals State
+  const [showAssistantBriefing, setShowAssistantBriefing] = useState(false)
+  const [userTitle, setUserTitle] = useState<'Sir' | 'Mam'>('Sir')
   const [showFocusModal, setShowFocusModal] = useState(false)
   const [activeFocusTask, setActiveFocusTask] = useState<Task | null>(null)
   const [showOptimizerModal, setShowOptimizerModal] = useState(false)
@@ -178,13 +181,25 @@ export default function HomePage() {
 
     setShowOnboarding(false)
 
-    // Schedule 8:00 AM daily briefing
+    // Read user title (Sir / Mam)
+    if (typeof localStorage !== 'undefined') {
+      const storedTitle = (localStorage.getItem('nexra_user_title') || 'Sir') as 'Sir' | 'Mam'
+      setUserTitle(storedTitle === 'Mam' ? 'Mam' : 'Sir')
+    }
+
+    // Schedule 8:00 AM daily briefing & sync all task alarms
     scheduleDailyMorningBriefing(8, 0)
     requestNotificationPermission()
+    syncAllActiveReminders()
 
     fetchDashboard()
 
     const handleDataChanged = () => {
+      if (typeof localStorage !== 'undefined') {
+        const storedTitle = (localStorage.getItem('nexra_user_title') || 'Sir') as 'Sir' | 'Mam'
+        setUserTitle(storedTitle === 'Mam' ? 'Mam' : 'Sir')
+      }
+      syncAllActiveReminders()
       fetchDashboard()
     }
 
@@ -247,7 +262,10 @@ export default function HomePage() {
   }
 
   const now = new Date()
-  const greeting = getGreeting(data?.user?.name || 'User')
+  const rawUserName = data?.user?.name
+  const hasCustomName = rawUserName && rawUserName !== 'User' && rawUserName !== 'Friend'
+  const displaySalutation = hasCustomName ? `${rawUserName} ${userTitle}` : userTitle
+  const greeting = getGreeting(rawUserName || 'User', userTitle)
 
   // Filter tasks based on selected tab
   const allTodayTasks = data?.today.tasks || []
@@ -474,7 +492,31 @@ export default function HomePage() {
 
   return (
     <div className="app-shell">
-      <AppHeader />
+      <AppHeader
+        rightContent={
+          <button
+            onClick={() => setShowAddSheet(true)}
+            title="Quick Add Task (No AI)"
+            className="notif-btn"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'var(--brand-primary, #6366F1)',
+              color: '#FFFFFF',
+              border: 'none',
+              borderRadius: '50%',
+              width: 36,
+              height: 36,
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(99, 102, 241, 0.35)',
+            }}
+            id="header-quick-add-task-btn"
+          >
+            <PlusIcon />
+          </button>
+        }
+      />
 
       <div className="page-content" style={{ paddingBottom: '95px' }}>
 
@@ -540,6 +582,30 @@ export default function HomePage() {
                     DONE
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── 1.5 PERSONAL AI ASSISTANT DAILY EXECUTIVE BRIEFING TRIGGER ── */}
+        <div className="page-section" style={{ marginTop: 'var(--space-2)' }}>
+          <div
+            className="home-assistant-card fade-in-up"
+            onClick={() => setShowAssistantBriefing(true)}
+            title="Open Daily Executive Briefing with Nexra Assistant"
+          >
+            <div className="home-assistant-content">
+              <div className="home-assistant-left">
+                <div className="home-assistant-avatar">
+                  ⚡
+                </div>
+                <div className="home-assistant-headline">
+                  Mission Briefing for {displaySalutation}
+                </div>
+              </div>
+              <div className="home-assistant-cta-badge">
+                <span>Briefing</span>
+                <span>→</span>
               </div>
             </div>
           </div>
@@ -629,17 +695,17 @@ export default function HomePage() {
             </span>
           </div>
 
-          {/* 2x2 Pastel Analytics Grid */}
+          {/* Single-Line Horizontal Analytics Cards */}
           <div className="home-bento-grid">
             {/* Card 1: Focus Hours */}
             <div className="bento-stat-card bento-cyan fade-in-up">
               <div className="bento-top-row">
                 <div className="bento-icon-box" style={{ color: '#0284C7' }}>⚡</div>
-                <span className="bento-pill-badge" style={{ color: '#0284C7' }}>+35m today</span>
+                <span className="bento-pill-badge" style={{ color: '#0284C7' }}>+35m</span>
               </div>
               <div>
                 <div className="bento-value">2.5h</div>
-                <div className="bento-label">Deep Focus</div>
+                <div className="bento-label">Focus</div>
               </div>
             </div>
 
@@ -647,11 +713,11 @@ export default function HomePage() {
             <div className="bento-stat-card bento-emerald fade-in-up">
               <div className="bento-top-row">
                 <div className="bento-icon-box" style={{ color: '#059669' }}>🎯</div>
-                <span className="bento-pill-badge" style={{ color: '#059669' }}>{progressPercent}% rate</span>
+                <span className="bento-pill-badge" style={{ color: '#059669' }}>{progressPercent}%</span>
               </div>
               <div>
                 <div className="bento-value">{completedCount}/{totalCount}</div>
-                <div className="bento-label">Tasks Done</div>
+                <div className="bento-label">Tasks</div>
               </div>
             </div>
 
@@ -659,11 +725,11 @@ export default function HomePage() {
             <div className="bento-stat-card bento-amber fade-in-up">
               <div className="bento-top-row">
                 <div className="bento-icon-box" style={{ color: '#D97706' }}>🔥</div>
-                <span className="bento-pill-badge" style={{ color: '#D97706' }}>Best yet!</span>
+                <span className="bento-pill-badge" style={{ color: '#D97706' }}>Best</span>
               </div>
               <div>
                 <div className="bento-value">7 Days</div>
-                <div className="bento-label">Habit Streak</div>
+                <div className="bento-label">Streak</div>
               </div>
             </div>
 
@@ -671,43 +737,12 @@ export default function HomePage() {
             <div className="bento-stat-card bento-rose fade-in-up">
               <div className="bento-top-row">
                 <div className="bento-icon-box" style={{ color: '#E11D48' }}>📈</div>
-                <span className="bento-pill-badge" style={{ color: '#E11D48' }}>Optimal</span>
+                <span className="bento-pill-badge" style={{ color: '#E11D48' }}>Peak</span>
               </div>
               <div>
                 <div className="bento-value">94</div>
-                <div className="bento-label">Energy Index</div>
+                <div className="bento-label">Energy</div>
               </div>
-            </div>
-          </div>
-
-          {/* Minimalist Weekly Activity Bar Chart */}
-          <div className="home-weekly-pulse-card fade-in-up">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--text-primary)' }}>
-                Weekly Momentum
-              </span>
-              <span style={{ fontSize: '11px', fontWeight: 600, color: '#6366F1' }}>
-                Avg 3.2h focus / day
-              </span>
-            </div>
-
-            <div className="weekly-bars-row">
-              {weeklyBars.map((bar, i) => (
-                <div key={i} className="weekly-bar-track">
-                  <div
-                    className={`weekly-bar-fill ${bar.active ? 'active' : ''}`}
-                    style={{ height: `${bar.fill}%` }}
-                  />
-                </div>
-              ))}
-            </div>
-
-            <div className="weekly-bar-labels">
-              {weeklyBars.map((bar, i) => (
-                <div key={i} className={`weekly-bar-label ${bar.active ? 'active' : ''}`}>
-                  {bar.day}
-                </div>
-              ))}
             </div>
           </div>
         </div>
@@ -749,10 +784,6 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* ── 4. FOCUS FLOW COMPACT TIMER ─────────────────────────────── */}
-        <div className="page-section">
-          <FocusTimerCard tasks={data?.today?.tasks || []} />
-        </div>
 
         {/* ── 5. SRUSHTI SUGGESTS BANNER ──────────────────────────────── */}
         {briefing?.aiRecommendation && (
@@ -970,25 +1001,65 @@ export default function HomePage() {
           </div>
         )}
 
+        {/* Floating Quick-Add Task Button (No AI required) */}
+        <button
+          className="home-floating-add-btn fade-in-up"
+          onClick={() => setShowAddSheet(true)}
+          title="Quick Add Task"
+          id="home-fab-add-task"
+          aria-label="Quick Add Task"
+        >
+          <PlusIcon />
+        </button>
+
       </div>
 
-      {/* ── QUICK ADD TASK BOTTOM SHEET ─────────────────────────── */}
+      {/* ── QUICK ADD TASK BOTTOM SHEET (NO AI REQUIRED) ─────────────────────────── */}
       {showAddSheet && (
         <>
           <div className="sheet-overlay" onClick={() => setShowAddSheet(false)} />
           <div className="bottom-sheet">
             <div className="sheet-handle" />
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 700, marginBottom: 'var(--space-4)' }}>
-              Quick Add Task
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)' }}>
+              <div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-lg)', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  Quick Add Task
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                  Instant task creation · No AI needed
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAddSheet(false)}
+                style={{
+                  background: 'var(--bg-muted)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: 28,
+                  height: 28,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                ✕
+              </button>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
               <div className="input-group">
-                <label className="input-label">Task Title</label>
+                <label className="input-label">Task Name</label>
                 <input
                   className="input"
-                  placeholder="e.g. CAO Revision, Submit Lab..."
+                  placeholder="What needs to be done?"
                   value={newTask.title}
                   onChange={e => setNewTask(p => ({ ...p, title: e.target.value }))}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleAddTask()
+                  }}
                   autoFocus
                 />
               </div>
@@ -1012,6 +1083,7 @@ export default function HomePage() {
                         color: newTask.priority === p ? 'white' : 'var(--text-secondary)',
                         border: 'none',
                         cursor: 'pointer',
+                        transition: 'all 0.15s ease',
                       }}
                     >
                       {p}
@@ -1021,17 +1093,39 @@ export default function HomePage() {
               </div>
 
               <div className="input-group">
-                <label className="input-label">Estimated Time (mins)</label>
-                <input
-                  type="number"
-                  className="input"
-                  value={newTask.estimatedMinutes}
-                  onChange={e => setNewTask(p => ({ ...p, estimatedMinutes: parseInt(e.target.value) || 30 }))}
-                />
+                <label className="input-label">Estimated Time</label>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {[15, 30, 45, 60].map(mins => (
+                    <button
+                      key={mins}
+                      type="button"
+                      onClick={() => setNewTask(p => ({ ...p, estimatedMinutes: mins }))}
+                      style={{
+                        flex: 1,
+                        padding: '6px',
+                        borderRadius: 'var(--radius-md)',
+                        fontSize: '11.5px',
+                        fontWeight: 600,
+                        background: newTask.estimatedMinutes === mins ? 'var(--brand-primary, #6366F1)' : 'var(--bg-muted)',
+                        color: newTask.estimatedMinutes === mins ? '#FFFFFF' : 'var(--text-secondary)',
+                        border: 'none',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      {mins}m
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <button className="btn btn-primary btn-full" onClick={handleAddTask}>
-                Create Task
+              <button
+                className="btn btn-primary btn-full"
+                onClick={handleAddTask}
+                disabled={!newTask.title.trim()}
+                style={{ marginTop: 4, padding: '11px', borderRadius: 12, fontWeight: 700 }}
+              >
+                + Add Task
               </button>
             </div>
           </div>
@@ -1077,6 +1171,32 @@ export default function HomePage() {
           }}
           onPlanCreated={() => {
             fetchDashboard()
+          }}
+        />
+      )}
+
+      {/* ── PERSONAL ASSISTANT DAILY BRIEFING DIALOG ── */}
+      {showAssistantBriefing && (
+        <AssistantBriefingModal
+          isOpen={showAssistantBriefing}
+          onClose={() => {
+            setShowAssistantBriefing(false)
+            fetchDashboard()
+          }}
+          userName={data?.user?.name}
+          todayTasks={allTodayTasks}
+          events={data?.today.events || []}
+          completedCount={completedCount}
+          totalCount={totalCount}
+          onStartTask={(task) => {
+            setActiveFocusTask(task)
+            setShowFocusModal(true)
+          }}
+          onOpenOptimizer={() => {
+            setShowOptimizerModal(true)
+          }}
+          onToggleTask={(task) => {
+            handleToggleTask(task)
           }}
         />
       )}

@@ -571,9 +571,9 @@ export default function ChatPage() {
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      sendMessage(input)
+    // Enter key creates a new line; send button is used to send
+    if (e.key === 'Enter') {
+      setTimeout(adjustTextareaHeight, 10)
     }
   }
 
@@ -1091,27 +1091,6 @@ export default function ChatPage() {
           )}
 
           <div className="chat-floating-dock">
-            {/* Dock Header Row */}
-            <div className="chat-dock-status-row">
-              <span style={{ color: '#64748B', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ color: '#8B5CF6' }}>⚡</span> 300 Credit remaining
-              </span>
-              <a
-                href="/settings"
-                style={{
-                  color: '#7C3AED',
-                  fontWeight: 700,
-                  textDecoration: 'none',
-                  fontSize: '11px',
-                  background: 'rgba(124, 58, 237, 0.08)',
-                  padding: '2px 8px',
-                  borderRadius: '10px',
-                }}
-              >
-                Upgrade
-              </a>
-            </div>
-
             {/* Inner Dock Box */}
             <div className="chat-dock-box">
               <textarea
@@ -1197,27 +1176,39 @@ export default function ChatPage() {
       {/* ── CHAT HISTORY SLIDE-OVER DRAWER ─────────────────────────── */}
       {showHistoryDrawer && (
         <>
-          <div className="sheet-overlay" onClick={() => setShowHistoryDrawer(false)} />
           <div
-            className="card fade-in-up"
+            className="sheet-overlay"
+            style={{ zIndex: 1200 }}
+            onClick={() => setShowHistoryDrawer(false)}
+          />
+          <div
             style={{
               position: 'fixed',
               top: 0,
               right: 0,
               bottom: 0,
               width: '85%',
-              maxWidth: 340,
-              zIndex: 200,
+              maxWidth: 360,
+              zIndex: 1250,
               borderRadius: 0,
               borderLeft: '1px solid var(--border-default)',
-              boxShadow: 'var(--shadow-xl)',
+              boxShadow: '-10px 0 36px rgba(15, 23, 42, 0.3)',
               background: 'var(--bg-surface)',
               display: 'flex',
               flexDirection: 'column',
+              animation: 'drawerSlideLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
             }}
           >
             {/* Drawer Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-4) var(--space-5)', borderBottom: '1px solid var(--border-subtle)' }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: 'var(--space-4) var(--space-5)',
+              paddingTop: 'max(var(--space-4), env(safe-area-inset-top, 16px))',
+              borderBottom: '1px solid var(--border-subtle)',
+              background: 'var(--bg-surface)',
+            }}>
               <div>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-lg)', fontWeight: 800, color: 'var(--text-primary)' }}>
                   Chat History
@@ -1226,13 +1217,36 @@ export default function ChatPage() {
                   {conversations.length} saved threads
                 </div>
               </div>
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={startNewChat}
-                style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: 4 }}
-              >
-                <PlusIcon /> New
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={startNewChat}
+                  style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: 4 }}
+                >
+                  <PlusIcon /> New
+                </button>
+                <button
+                  onClick={() => setShowHistoryDrawer(false)}
+                  style={{
+                    background: 'var(--bg-subtle)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: '8px',
+                    width: 32,
+                    height: 32,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '15px',
+                    fontWeight: 700,
+                    color: 'var(--text-secondary)',
+                    cursor: 'pointer',
+                  }}
+                  title="Close History"
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
             {/* Conversations List */}
@@ -1249,15 +1263,16 @@ export default function ChatPage() {
                       key={conv.id}
                       onClick={() => selectConversation(conv.id)}
                       style={{
-                        padding: '10px 12px',
+                        padding: '12px 14px',
                         borderRadius: 'var(--radius-lg)',
-                        background: isActive ? 'var(--bg-subtle)' : 'transparent',
+                        background: isActive ? 'var(--bg-subtle)' : 'var(--bg-card, #ffffff)',
                         border: isActive ? '1.5px solid var(--brand-primary)' : '1px solid var(--border-subtle)',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         gap: 8,
+                        boxShadow: isActive ? '0 2px 8px rgba(99, 102, 241, 0.12)' : '0 1px 3px rgba(0, 0, 0, 0.04)',
                         transition: 'all var(--transition-fast)',
                       }}
                     >
@@ -1297,12 +1312,17 @@ export default function ChatPage() {
             </div>
 
             {/* Drawer Close Footer */}
-            <div style={{ padding: 'var(--space-4)', borderTop: '1px solid var(--border-subtle)' }}>
+            <div style={{
+              padding: 'var(--space-4)',
+              paddingBottom: 'max(var(--space-4), env(safe-area-inset-bottom, 16px))',
+              borderTop: '1px solid var(--border-subtle)',
+              background: 'var(--bg-surface)',
+            }}>
               <button
                 className="btn btn-secondary btn-full"
                 onClick={() => setShowHistoryDrawer(false)}
               >
-                Close Drawer
+                Close History
               </button>
             </div>
           </div>
