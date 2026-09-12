@@ -3,6 +3,8 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { LocalDocument, localDb } from '@/lib/db/localDb'
+import { openPdfWithDefaultViewer } from '@/lib/pdf/pdfViewer'
+import { Capacitor } from '@capacitor/core'
 
 interface FileViewerModalProps {
   doc: LocalDocument | null
@@ -22,6 +24,7 @@ export default function FileViewerModal({
   const router = useRouter()
   const [copied, setCopied] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [isOpeningPdf, setIsOpeningPdf] = useState(false)
 
   const isPdf = doc ? (doc.type === 'pdf' || (doc.mimeType && doc.mimeType.includes('pdf'))) : false
 
@@ -77,10 +80,24 @@ export default function FileViewerModal({
     router.push('/chat')
   }
 
-  const handleOpenPdfExternal = () => {
-    const targetUrl = pdfBlobUrl || doc.dataUrl
-    if (targetUrl) {
-      window.open(targetUrl, '_blank')
+  const handleOpenPdfExternal = async () => {
+    if (!doc) return
+    setIsOpeningPdf(true)
+    try {
+      const res = await openPdfWithDefaultViewer({
+        dataUrl: doc.dataUrl,
+        content: doc.content,
+        notes: doc.notes,
+        title: doc.title,
+      })
+      if (!res.success && res.error) {
+        alert(res.error)
+      }
+    } catch (err: any) {
+      console.error('Error launching PDF viewer:', err)
+      alert('Could not open default PDF viewer. Please check that Google Drive or a PDF reader is installed.')
+    } finally {
+      setIsOpeningPdf(false)
     }
   }
 
@@ -275,68 +292,119 @@ export default function FileViewerModal({
             </div>
           )}
 
-          {/* PDF Viewer & In-App Embedded Frame */}
+          {/* PDF Viewer & Drive / Default Viewer Launcher */}
           {isPdf && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
-              {/* PDF Action Bar */}
+              {/* Dedicated Drive PDF Viewer Action Card */}
               <div
                 style={{
+                  background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(245, 158, 11, 0.08))',
+                  border: '1.5px solid rgba(239, 68, 68, 0.25)',
+                  borderRadius: 'var(--radius-lg)',
+                  padding: '16px',
                   display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '10px 14px',
-                  background: 'var(--bg-subtle)',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--border-subtle)',
-                  flexWrap: 'wrap',
-                  gap: 8,
+                  flexDirection: 'column',
+                  gap: 12,
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 20 }}>📑</span>
-                  <div>
-                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                      PDF Reader
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 12,
+                        background: '#EF4444',
+                        color: '#FFF',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 22,
+                        boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)',
+                        flexShrink: 0,
+                      }}
+                    >
+                      📄
                     </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
-                      {formatFileSize(doc.size) || 'Document'}
+                    <div>
+                      <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--text-primary)', wordBreak: 'break-word' }}>
+                        {doc.title}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: 2 }}>
+                        PDF Document · {formatFileSize(doc.size) || 'Ready'}
+                      </div>
                     </div>
+                  </div>
+
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 5,
+                      background: 'rgba(34, 197, 94, 0.12)',
+                      color: '#16A34A',
+                      padding: '3px 9px',
+                      borderRadius: 8,
+                      fontSize: '10.5px',
+                      fontWeight: 700,
+                    }}
+                  >
+                    <span>⚡</span> Drive / System PDF Viewer
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
                   <button
                     type="button"
-                    className="btn btn-secondary btn-sm"
                     onClick={handleOpenPdfExternal}
-                    style={{ fontSize: '11.5px', padding: '5px 12px', display: 'flex', alignItems: 'center', gap: 4, borderRadius: 8 }}
-                    title="Open in full screen or external viewer"
+                    disabled={isOpeningPdf}
+                    style={{
+                      flex: 1,
+                      minWidth: '200px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                      background: 'linear-gradient(135deg, #EF4444, #DC2626)',
+                      color: '#FFFFFF',
+                      padding: '12px 18px',
+                      borderRadius: 12,
+                      fontWeight: 800,
+                      fontSize: '13px',
+                      border: 'none',
+                      cursor: isOpeningPdf ? 'not-allowed' : 'pointer',
+                      boxShadow: '0 4px 14px rgba(239, 68, 68, 0.35)',
+                      transition: 'transform 0.15s ease',
+                    }}
                   >
-                    <span>🚀</span> Fullscreen
+                    <span>{isOpeningPdf ? '⏳' : '🚀'}</span>
+                    <span>{isOpeningPdf ? 'Opening in PDF Viewer...' : 'Open in Drive PDF Viewer'}</span>
                   </button>
+
                   <button
                     type="button"
-                    className="btn btn-primary btn-sm"
+                    className="btn btn-secondary"
                     onClick={handleDownload}
-                    style={{ fontSize: '11.5px', padding: '5px 12px', display: 'flex', alignItems: 'center', gap: 4, borderRadius: 8 }}
-                    title="Save PDF"
+                    style={{ fontSize: '12px', padding: '11px 16px', borderRadius: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                    title="Download PDF file"
                   >
                     <span>⬇️</span> Download
                   </button>
                 </div>
               </div>
 
-              {/* In-App Embedded Frame */}
-              {pdfBlobUrl ? (
+              {/* In-App Desktop Preview Frame (only if browser environment and blob available) */}
+              {!Capacitor.isNativePlatform() && pdfBlobUrl && (
                 <div
                   style={{
                     width: '100%',
-                    height: '480px',
+                    height: '460px',
                     borderRadius: 'var(--radius-lg)',
                     overflow: 'hidden',
                     border: '1px solid var(--border-default)',
                     background: '#334155',
                     position: 'relative',
+                    marginTop: 8,
                   }}
                 >
                   <iframe
@@ -344,32 +412,6 @@ export default function FileViewerModal({
                     style={{ width: '100%', height: '100%', border: 'none' }}
                     title={doc.title}
                   />
-                </div>
-              ) : (
-                <div
-                  style={{
-                    background: 'rgba(239, 68, 68, 0.06)',
-                    border: '1px solid rgba(239, 68, 68, 0.2)',
-                    borderRadius: 'var(--radius-lg)',
-                    padding: 'var(--space-6)',
-                    textAlign: 'center',
-                  }}
-                >
-                  <div style={{ fontSize: 44, marginBottom: 8 }}>📑</div>
-                  <div style={{ fontWeight: 700, fontSize: 'var(--text-base)', color: 'var(--text-primary)' }}>
-                    {doc.title}
-                  </div>
-                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginTop: 4 }}>
-                    PDF Document · {formatFileSize(doc.size)}
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm"
-                    onClick={handleOpenPdfExternal}
-                    style={{ marginTop: 'var(--space-4)' }}
-                  >
-                    🚀 Open PDF Document
-                  </button>
                 </div>
               )}
             </div>

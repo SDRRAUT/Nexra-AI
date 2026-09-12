@@ -12,6 +12,7 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(PdfOpenerPlugin.class);
         super.onCreate(savedInstanceState);
 
         // Ensure microphone permissions are requested for voice input in the APK

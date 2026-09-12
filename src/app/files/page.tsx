@@ -7,6 +7,7 @@ import BottomNav from '@/components/layout/BottomNav'
 import UploadFileModal from '@/components/files/UploadFileModal'
 import FileViewerModal from '@/components/files/FileViewerModal'
 import { LocalDocument, localDb } from '@/lib/db/localDb'
+import { openPdfWithDefaultViewer, generateSimplePdfBase64 } from '@/lib/pdf/pdfViewer'
 
 type FileCategory = 'all' | 'pdf' | 'image' | 'doc' | 'code' | 'sheet' | 'starred'
 type SortOption = 'recent' | 'name' | 'size'
@@ -117,15 +118,19 @@ export default function FilesPage() {
   // Pre-seed sample document for testing instant search if empty
   const handleSeedSampleFiles = async () => {
     const now = new Date().toISOString()
+    const mathNotes = 'Covers linear algebra, multivariable calculus, and probability distributions.\nKey Theorems:\n1. Cayley-Hamilton Theorem\n2. Stokes Theorem & Divergence Theorem\n3. Central Limit Theorem & Normal Distribution'
+    const physicsNotes = 'Kinematics, rotational dynamics, work-energy theorem, and harmonic motion.\nKey Formulas:\n1. v = u + at\n2. Torque = I * alpha\n3. Kinetic Energy = 0.5 * m * v^2'
+
     const samples: LocalDocument[] = [
       {
         id: `file-sample-1`,
         title: 'Mathematics Final Exam Syllabus & Topics',
         type: 'pdf',
         mimeType: 'application/pdf',
+        dataUrl: 'data:application/pdf;base64,' + generateSimplePdfBase64('Mathematics Final Exam Syllabus & Topics', '', mathNotes),
         size: 245000,
         tags: ['exam', 'math', 'syllabus', 'sem4'],
-        notes: 'Covers linear algebra, multivariable calculus, and probability distributions.',
+        notes: mathNotes,
         isFavorite: true,
         pinned: true,
         createdAt: now,
@@ -136,9 +141,10 @@ export default function FilesPage() {
         title: 'Physics Mechanics Formula Reference',
         type: 'pdf',
         mimeType: 'application/pdf',
+        dataUrl: 'data:application/pdf;base64,' + generateSimplePdfBase64('Physics Mechanics Formula Reference', '', physicsNotes),
         size: 180000,
         tags: ['physics', 'formula', 'exam'],
-        notes: 'Kinematics, rotational dynamics, work-energy theorem, and harmonic motion.',
+        notes: physicsNotes,
         isFavorite: true,
         createdAt: now,
         updatedAt: now,
@@ -601,8 +607,38 @@ export default function FilesPage() {
                       </div>
                     </div>
 
-                    {/* Right: Quick Star & Open Arrow */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                    {/* Right: Quick PDF Open, Star & Open Arrow */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                      {doc.type === 'pdf' && (
+                        <button
+                          type="button"
+                          onClick={async e => {
+                            e.stopPropagation()
+                            await openPdfWithDefaultViewer({
+                              dataUrl: doc.dataUrl,
+                              content: doc.content,
+                              notes: doc.notes,
+                              title: doc.title,
+                            })
+                          }}
+                          style={{
+                            background: 'rgba(239, 68, 68, 0.1)',
+                            border: '1px solid rgba(239, 68, 68, 0.25)',
+                            color: '#EF4444',
+                            borderRadius: 8,
+                            padding: '3px 8px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 3,
+                            cursor: 'pointer',
+                          }}
+                          title="Open directly in Drive PDF Viewer or default viewer"
+                        >
+                          <span>📄</span> Open
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="btn btn-ghost btn-sm"
