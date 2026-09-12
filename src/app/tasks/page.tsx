@@ -154,11 +154,6 @@ export default function TasksPage() {
       <AppHeader
         title="Tasks"
         showBrand={false}
-        rightContent={
-          <button className="btn-icon btn btn-primary" onClick={() => setShowAddSheet(true)} id="add-task-btn">
-            <PlusIcon />
-          </button>
-        }
       />
 
       <div className="page-content">
@@ -496,6 +491,17 @@ export default function TasksPage() {
           </div>
         </>
       )}
+
+      {/* Floating Action Button (FAB) anchored at bottom-right directly above BottomNav */}
+      <button
+        className="home-floating-add-btn fade-in-up"
+        onClick={() => setShowAddSheet(true)}
+        title="Quick Add Task"
+        id="tasks-fab-add-task"
+        aria-label="Quick Add Task"
+      >
+        <PlusIcon />
+      </button>
 
       <BottomNav />
     </div>
