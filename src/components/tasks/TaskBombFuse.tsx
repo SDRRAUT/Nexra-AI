@@ -16,18 +16,14 @@ export interface TaskBombFuseProps {
   compact?: boolean
 }
 
-export function TaskBombFuse({ task, urgentOverride = false, compact = false }: TaskBombFuseProps) {
+export function TaskBombFuse({ task, compact = false }: TaskBombFuseProps) {
   const fuseState = useMemo(() => {
     const isDone = task.status === 'completed'
     if (isDone) {
       return {
         status: 'defused' as const,
-        percent: 0,
-        statusText: 'Completed',
-        statusIcon: '✓',
-        timeText: 'Done',
-        statusColor: '#10B981',
-        bombEmoji: '🛡️',
+        percent: 100,
+        sparkColor: '#10B981',
       }
     }
 
@@ -35,12 +31,10 @@ export function TaskBombFuse({ task, urgentOverride = false, compact = false }: 
 
     // Determine target deadline timestamp
     let targetTime: number
-    let hasExplicitTime = false
     if (task.deadline) {
       const parsed = new Date(task.deadline).getTime()
       if (!isNaN(parsed)) {
         targetTime = parsed
-        hasExplicitTime = true
       } else {
         const endOfDay = new Date()
         endOfDay.setHours(23, 59, 59, 999)
@@ -50,7 +44,6 @@ export function TaskBombFuse({ task, urgentOverride = false, compact = false }: 
       const parsed = new Date(task.scheduledStart).getTime()
       if (!isNaN(parsed)) {
         targetTime = parsed
-        hasExplicitTime = true
       } else {
         const endOfDay = new Date()
         endOfDay.setHours(23, 59, 59, 999)
@@ -64,116 +57,57 @@ export function TaskBombFuse({ task, urgentOverride = false, compact = false }: 
 
     const diffMs = targetTime - now
 
-    // ── 1. OVERDUE ──────────────────────────────────────────────────
+    // ── OVERDUE ──────────────────────────────────────────────────
     if (diffMs <= 0) {
-      const overdueMins = Math.max(1, Math.round(Math.abs(diffMs) / (1000 * 60)))
-      const overdueStr =
-        overdueMins < 60
-          ? `${overdueMins}m`
-          : `${Math.floor(overdueMins / 60)}h ${overdueMins % 60}m`
-
       return {
         status: 'blasted' as const,
         percent: 100,
-        statusText: 'Overdue',
-        statusIcon: '💥',
-        timeText: `${overdueStr} late`,
-        statusColor: '#EF4444',
-        bombEmoji: '💥',
+        sparkColor: '#EF4444',
       }
     }
 
-    // ── 2. BURNING / TICKING DOWN ───────────────────────────────────
-    const diffMins = Math.max(1, Math.round(diffMs / (1000 * 60)))
-    // Only mark critical if under 60 minutes or explicitly critical under 2 hours
-    const isCritical = diffMins <= 60 || (task.priority === 'critical' && diffMins <= 180)
-
-    // Reference timeline window: 8 hours (or 1 day)
+    // Reference timeline window: 8 hours (or day span)
     const windowMs = 8 * 60 * 60 * 1000
     const rawBurned = 1 - Math.min(Math.max(diffMs / windowMs, 0), 1)
-    // Scale burn percent from 10% to 92%
-    const percent = Math.min(92, Math.max(12, Math.round(rawBurned * 100)))
+    // Scale burn percent from 8% to 96%
+    const percent = Math.min(96, Math.max(8, Math.round(rawBurned * 100)))
 
-    const timeText =
-      diffMins < 60
-        ? `${diffMins}m left`
-        : diffMins < 1440
-        ? `${Math.floor(diffMins / 60)}h ${diffMins % 60}m left`
-        : `${Math.round(diffMins / 1440)}d left`
-
-    if (isCritical) {
-      return {
-        status: 'urgent' as const,
-        percent: Math.max(percent, 80),
-        statusText: 'Urgent Deadline',
-        statusIcon: '⚡',
-        timeText,
-        statusColor: '#EF4444',
-        bombEmoji: '💣',
-      }
+    let sparkColor = '#10B981'
+    if (percent > 75) {
+      sparkColor = '#EF4444'
+    } else if (percent > 40) {
+      sparkColor = '#F59E0B'
     }
 
     return {
-      status: 'burning' as const,
+      status: percent > 75 ? ('urgent' as const) : ('burning' as const),
       percent,
-      statusText: 'Active Fuse',
-      statusIcon: '🔥',
-      timeText: hasExplicitTime ? timeText : `${timeText}`,
-      statusColor: '#D97706',
-      bombEmoji: '💣',
+      sparkColor,
     }
-  }, [task, urgentOverride])
+  }, [task])
 
   return (
-    <div
-      className={`task-bomb-fuse-container ${fuseState.status} ${
-        compact ? 'compact' : ''
-      }`}
-    >
-      {/* Top clean micro-header */}
-      <div className="task-bomb-fuse-header">
+    <div className={`task-bomb-fuse-container ${fuseState.status} ${compact ? 'compact' : ''}`}>
+      {/* Pure Minimalist Gradient Deadline Line (Green -> Amber -> Red at the end) */}
+      <div className="task-bomb-fuse-track-bg">
         <div
-          className="task-bomb-fuse-status"
-          style={{ color: fuseState.statusColor }}
-        >
-          <span style={{ fontSize: '11px' }}>{fuseState.statusIcon}</span>
-          <span>{fuseState.statusText}</span>
-        </div>
-        <div
-          className="task-bomb-fuse-time"
-          style={{ color: fuseState.statusColor }}
-        >
-          {fuseState.timeText}
-        </div>
-      </div>
+          className={`task-bomb-fuse-progress ${fuseState.status}`}
+          style={{ width: `${fuseState.percent}%` }}
+        />
 
-      {/* Ultra-slim Minimalist Fuse Track */}
-      <div className="task-bomb-fuse-track-row">
-        <div className="task-bomb-fuse-track-bg">
-          {/* Active Burning Progress Line */}
+        {fuseState.status !== 'defused' && (
           <div
-            className={`task-bomb-fuse-progress ${fuseState.status}`}
-            style={{ width: `${fuseState.percent}%` }}
-          />
-
-          {/* Minimalist Glowing Spark Tip */}
-          {fuseState.status !== 'defused' && (
-            <div
-              className="task-bomb-fuse-spark"
-              style={{ left: `${fuseState.percent}%` }}
-            >
-              <span className="task-bomb-fuse-spark-dot" />
-            </div>
-          )}
-        </div>
-
-        {/* Minimal Bomb Icon */}
-        <div
-          className={`task-bomb-fuse-bomb-icon ${fuseState.status}`}
-          title={fuseState.statusText}
-        >
-          {fuseState.bombEmoji}
-        </div>
+            className="task-bomb-fuse-spark"
+            style={{ left: `${fuseState.percent}%` }}
+          >
+            <span
+              className="task-bomb-fuse-spark-dot"
+              style={{
+                boxShadow: `0 0 4px ${fuseState.sparkColor}, 0 0 8px ${fuseState.sparkColor}`,
+              }}
+            />
+          </div>
+        )}
       </div>
     </div>
   )

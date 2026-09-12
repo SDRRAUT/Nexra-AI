@@ -5402,15 +5402,14 @@ input, textarea, select { font-family: inherit; }
 }
 
 /* ════════════════════════════════════════════════════════════════
-   MINIMALIST DEADLINE FUSE INDICATOR
+   MINIMALIST DEADLINE LINE INDICATOR (PURE GRADIENT: GREEN -> AMBER -> RED)
    ════════════════════════════════════════════════════════════════ */
 
 .task-bomb-fuse-container {
   display: flex;
   flex-direction: column;
-  gap: 4px;
   width: 100%;
-  padding: 8px 14px 4px 14px;
+  padding: 8px 14px 2px 14px;
   position: relative;
   background: transparent;
   border: none;
@@ -5421,49 +5420,17 @@ input, textarea, select { font-family: inherit; }
   padding: 4px 10px 2px 10px;
 }
 
-.task-bomb-fuse-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  line-height: 1;
-}
-
-.task-bomb-fuse-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.2px;
-}
-
-.task-bomb-fuse-time {
-  font-size: 10.5px;
-  font-weight: 600;
-  font-family: var(--font-mono, monospace);
-  color: var(--text-secondary);
-}
-
-.task-bomb-fuse-track-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  position: relative;
-  width: 100%;
-}
-
 .task-bomb-fuse-track-bg {
   position: relative;
-  flex: 1;
-  height: 3px;
+  width: 100%;
+  height: 3.5px;
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.2);
+  background: rgba(148, 163, 184, 0.22);
   overflow: visible;
 }
 
 [data-theme="dark"] .task-bomb-fuse-track-bg {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .task-bomb-fuse-progress {
@@ -5475,24 +5442,23 @@ input, textarea, select { font-family: inherit; }
   transition: width 0.3s ease;
 }
 
-.task-bomb-fuse-progress.burning {
-  background: linear-gradient(90deg, #F59E0B, #EA580C);
-  box-shadow: 0 0 6px rgba(245, 158, 11, 0.35);
+/* In progress: vibrant gradient from green through amber to red at the end */
+.task-bomb-fuse-progress.burning,
+.task-bomb-fuse-progress.urgent {
+  background: linear-gradient(90deg, #10B981 0%, #22C55E 30%, #F59E0B 70%, #EF4444 100%);
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.25);
 }
 
-.task-bomb-fuse-progress.urgent {
-  background: linear-gradient(90deg, #F59E0B, #EF4444);
+/* Overdue: Pure vibrant red */
+.task-bomb-fuse-progress.blasted {
+  background: #EF4444;
   box-shadow: 0 0 8px rgba(239, 68, 68, 0.45);
 }
 
-.task-bomb-fuse-progress.blasted {
-  background: #EF4444;
-  box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
-}
-
+/* Defused / Completed: Pure full emerald green */
 .task-bomb-fuse-progress.defused {
   background: #10B981;
-  opacity: 0.6;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.35);
 }
 
 .task-bomb-fuse-spark {
@@ -5507,43 +5473,14 @@ input, textarea, select { font-family: inherit; }
 }
 
 .task-bomb-fuse-spark-dot {
-  width: 6.5px;
-  height: 6.5px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: #FFFFFF;
-  box-shadow: 0 0 4px #F59E0B, 0 0 8px #EF4444;
   animation: sparkMicroPulse 1.2s infinite alternate ease-in-out;
-}
-
-.task-bomb-fuse-bomb-icon {
-  font-size: 13px;
-  line-height: 1;
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0.85;
-}
-
-.task-bomb-fuse-bomb-icon.urgent {
-  animation: bombSubtlePulse 1.5s infinite ease-in-out;
-}
-
-.task-bomb-fuse-bomb-icon.blasted {
-  animation: bombBlastPop 0.8s infinite alternate ease-in-out;
 }
 
 @keyframes sparkMicroPulse {
   0% { transform: scale(0.9); opacity: 0.85; }
-  100% { transform: scale(1.3); opacity: 1; filter: drop-shadow(0 0 3px #F59E0B); }
-}
-
-@keyframes bombSubtlePulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.18); }
-}
-
-@keyframes bombBlastPop {
-  0% { transform: scale(1); }
-  100% { transform: scale(1.22); }
+  100% { transform: scale(1.3); opacity: 1; }
 }
