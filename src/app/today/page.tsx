@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AppHeader from '@/components/layout/AppHeader'
 import BottomNav from '@/components/layout/BottomNav'
+import TaskBombFuse from '@/components/tasks/TaskBombFuse'
 import { format, isToday } from 'date-fns'
 
 interface Task {
@@ -93,43 +94,46 @@ export default function TodayPage() {
   const doneTasks = filteredTasks.filter(t => t.status === 'completed')
 
   const renderTask = (task: Task) => (
-    <div key={task.id} className="task-item fade-in-up">
-      <div
-        className={`task-checkbox ${task.status === 'completed' ? 'completed' : ''}`}
-        onClick={() => handleToggle(task)}
-        style={{ borderColor: task.status !== 'completed' ? priorityColors[task.priority] : undefined }}
-      />
-      <div className="task-content">
-        <div className={`task-title ${task.status === 'completed' ? 'completed' : ''}`}>
-          {task.title}
-        </div>
-        <div className="task-meta">
-          <span style={{
-            fontSize: 'var(--text-xs)', fontWeight: 600,
-            color: priorityColors[task.priority],
-            background: priorityBg[task.priority],
-            padding: '1px 6px', borderRadius: 'var(--radius-full)'
-          }}>
-            {task.priority}
-          </span>
-          {task.scheduledStart && (
-            <span className="task-time">{format(new Date(task.scheduledStart), 'h:mm a')}</span>
-          )}
-          {task.estimatedMinutes && (
-            <span className="task-time">{task.estimatedMinutes}m</span>
-          )}
-          {task.postponeCount > 1 && (
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--priority-high)', fontWeight: 500 }}>
-              ⚠️ Postponed {task.postponeCount}×
+    <div key={task.id} className="task-card-wrapper fade-in-up">
+      <TaskBombFuse task={task} />
+      <div className="task-item">
+        <div
+          className={`task-checkbox ${task.status === 'completed' ? 'completed' : ''}`}
+          onClick={() => handleToggle(task)}
+          style={{ borderColor: task.status !== 'completed' ? priorityColors[task.priority] : undefined }}
+        />
+        <div className="task-content">
+          <div className={`task-title ${task.status === 'completed' ? 'completed' : ''}`}>
+            {task.title}
+          </div>
+          <div className="task-meta">
+            <span style={{
+              fontSize: 'var(--text-xs)', fontWeight: 600,
+              color: priorityColors[task.priority],
+              background: priorityBg[task.priority],
+              padding: '1px 6px', borderRadius: 'var(--radius-full)'
+            }}>
+              {task.priority}
             </span>
-          )}
+            {task.scheduledStart && (
+              <span className="task-time">{format(new Date(task.scheduledStart), 'h:mm a')}</span>
+            )}
+            {task.estimatedMinutes && (
+              <span className="task-time">{task.estimatedMinutes}m</span>
+            )}
+            {task.postponeCount > 1 && (
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--priority-high)', fontWeight: 500 }}>
+                ⚠️ Postponed {task.postponeCount}×
+              </span>
+            )}
+          </div>
         </div>
+        {task.scheduledStart && (
+          <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--text-tertiary)', flexShrink: 0, minWidth: 40, textAlign: 'right' }}>
+            {format(new Date(task.scheduledStart), 'HH:mm')}
+          </div>
+        )}
       </div>
-      {task.scheduledStart && (
-        <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--text-tertiary)', flexShrink: 0, minWidth: 40, textAlign: 'right' }}>
-          {format(new Date(task.scheduledStart), 'HH:mm')}
-        </div>
-      )}
     </div>
   )
 
@@ -209,7 +213,7 @@ export default function TodayPage() {
         {criticalTasks.length > 0 && (
           <div className="page-section">
             <div className="section-header"><div className="section-title">🔴 Critical</div></div>
-            <div className="card">{criticalTasks.map(renderTask)}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{criticalTasks.map(renderTask)}</div>
           </div>
         )}
 
@@ -217,7 +221,7 @@ export default function TodayPage() {
         {importantTasks.length > 0 && (
           <div className="page-section">
             <div className="section-header"><div className="section-title">🟡 Important</div></div>
-            <div className="card">{importantTasks.map(renderTask)}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{importantTasks.map(renderTask)}</div>
           </div>
         )}
 
@@ -225,7 +229,7 @@ export default function TodayPage() {
         {otherTasks.length > 0 && (
           <div className="page-section">
             <div className="section-header"><div className="section-title">📋 Tasks</div></div>
-            <div className="card">{otherTasks.map(renderTask)}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{otherTasks.map(renderTask)}</div>
           </div>
         )}
 
@@ -233,7 +237,7 @@ export default function TodayPage() {
         {doneTasks.length > 0 && filter !== 'pending' && (
           <div className="page-section">
             <div className="section-header"><div className="section-title">✅ Done</div></div>
-            <div className="card" style={{ opacity: 0.7 }}>{doneTasks.map(renderTask)}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, opacity: 0.7 }}>{doneTasks.map(renderTask)}</div>
           </div>
         )}
 

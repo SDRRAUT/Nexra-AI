@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AppHeader from '@/components/layout/AppHeader'
 import BottomNav from '@/components/layout/BottomNav'
+import TaskBombFuse from '@/components/tasks/TaskBombFuse'
 import { format } from 'date-fns'
 import { scheduleDailyMorningBriefing, requestNotificationPermission, syncAllActiveReminders } from '@/lib/notifications/native'
 
@@ -309,111 +310,116 @@ export default function HomePage() {
   const renderTaskItem = (task: Task) => {
     const isDone = task.status === 'completed'
     return (
-      <div key={task.id} className="home-task-row fade-in-up">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
-          <div
-            className={`home-task-checkbox ${isDone ? 'checked' : ''}`}
-            onClick={() => handleToggleTask(task)}
-            title={isDone ? 'Mark uncompleted' : 'Mark completed'}
-          >
-            {isDone && <span style={{ fontSize: 13, fontWeight: 800 }}>✓</span>}
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className={`home-task-title ${isDone ? 'completed' : ''}`}>
-              {task.title}
+      <div key={task.id} className="home-task-card-wrapper fade-in-up">
+        {/* Bomb Blast & Burning Rope Fuse Deadline Line */}
+        <TaskBombFuse task={task} />
+
+        <div className="home-task-row">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+            <div
+              className={`home-task-checkbox ${isDone ? 'checked' : ''}`}
+              onClick={() => handleToggleTask(task)}
+              title={isDone ? 'Mark uncompleted' : 'Mark completed'}
+            >
+              {isDone && <span style={{ fontSize: 13, fontWeight: 800 }}>✓</span>}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
-              <span
-                style={{
-                  fontSize: '10px',
-                  fontWeight: 700,
-                  color: priorityColors[task.priority],
-                  background: priorityBg[task.priority],
-                  padding: '1.5px 7px',
-                  borderRadius: 999,
-                  textTransform: 'capitalize',
-                  letterSpacing: '0.2px',
-                }}
-              >
-                {task.priority}
-              </span>
-              {task.category && (
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className={`home-task-title ${isDone ? 'completed' : ''}`}>
+                {task.title}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
                 <span
                   style={{
                     fontSize: '10px',
-                    fontWeight: 600,
-                    color: '#64748B',
-                    background: '#F1F5F9',
+                    fontWeight: 700,
+                    color: priorityColors[task.priority],
+                    background: priorityBg[task.priority],
                     padding: '1.5px 7px',
                     borderRadius: 999,
                     textTransform: 'capitalize',
+                    letterSpacing: '0.2px',
                   }}
                 >
-                  {task.category}
+                  {task.priority}
                 </span>
-              )}
-              {task.scheduledStart && (
-                <span style={{ fontSize: '11px', color: '#94A3B8', display: 'flex', alignItems: 'center', gap: 3 }}>
-                  <span>🕒</span> {format(new Date(task.scheduledStart), 'h:mm a')}
-                </span>
-              )}
-              {task.estimatedMinutes && (
-                <span style={{ fontSize: '11px', color: '#94A3B8' }}>
-                  · {task.estimatedMinutes}m
-                </span>
-              )}
-              {task.postponeCount > 0 && (
-                <span style={{ fontSize: '10px', color: '#F59E0B', fontWeight: 600 }}>
-                  ⚠️ {task.postponeCount}×
-                </span>
-              )}
+                {task.category && (
+                  <span
+                    style={{
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      color: '#64748B',
+                      background: '#F1F5F9',
+                      padding: '1.5px 7px',
+                      borderRadius: 999,
+                      textTransform: 'capitalize',
+                    }}
+                  >
+                    {task.category}
+                  </span>
+                )}
+                {task.scheduledStart && (
+                  <span style={{ fontSize: '11px', color: '#94A3B8', display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <span>🕒</span> {format(new Date(task.scheduledStart), 'h:mm a')}
+                  </span>
+                )}
+                {task.estimatedMinutes && (
+                  <span style={{ fontSize: '11px', color: '#94A3B8' }}>
+                    · {task.estimatedMinutes}m
+                  </span>
+                )}
+                {task.postponeCount > 0 && (
+                  <span style={{ fontSize: '10px', color: '#F59E0B', fontWeight: 600 }}>
+                    ⚠️ {task.postponeCount}×
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-          {!isDone && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+            {!isDone && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setActiveFocusTask(task)
+                  setShowFocusModal(true)
+                }}
+                style={{
+                  background: 'rgba(99, 102, 241, 0.08)',
+                  border: '1px solid rgba(99, 102, 241, 0.2)',
+                  color: '#6366F1',
+                  borderRadius: 8,
+                  padding: '3px 7px',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 3,
+                }}
+                title="Launch Pomodoro Focus Companion"
+              >
+                <span>⏱️</span>
+                <span style={{ fontSize: '10px' }}>Focus</span>
+              </button>
+            )}
             <button
-              onClick={(e) => {
-                e.stopPropagation()
-                setActiveFocusTask(task)
-                setShowFocusModal(true)
-              }}
+              onClick={(e) => handleDeleteTask(task.id, task.title, e)}
               style={{
-                background: 'rgba(99, 102, 241, 0.08)',
-                border: '1px solid rgba(99, 102, 241, 0.2)',
-                color: '#6366F1',
-                borderRadius: 8,
-                padding: '3px 7px',
-                fontSize: '11px',
-                fontWeight: 700,
+                background: 'transparent',
+                border: 'none',
+                color: '#94A3B8',
+                fontSize: '18px',
                 cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 3,
+                padding: '4px 6px',
+                lineHeight: 1,
+                borderRadius: 6,
+                transition: 'color 0.15s ease',
               }}
-              title="Launch Pomodoro Focus Companion"
+              title="Delete task"
             >
-              <span>⏱️</span>
-              <span style={{ fontSize: '10px' }}>Focus</span>
+              ×
             </button>
-          )}
-          <button
-            onClick={(e) => handleDeleteTask(task.id, task.title, e)}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#94A3B8',
-              fontSize: '18px',
-              cursor: 'pointer',
-              padding: '4px 6px',
-              lineHeight: 1,
-              borderRadius: 6,
-              transition: 'color 0.15s ease',
-            }}
-            title="Delete task"
-          >
-            ×
-          </button>
+          </div>
         </div>
       </div>
     )
@@ -694,31 +700,34 @@ export default function HomePage() {
                 <span>⚡</span> Priority Action
               </div>
             </div>
-            <div className="home-next-task-card fade-in-up">
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 3 }}>
-                  NEXT IN QUEUE
+            <div className="home-task-card-wrapper fade-in-up">
+              <TaskBombFuse task={data.today.nextTask} urgentOverride />
+              <div className="home-next-task-card" style={{ border: 'none', background: 'transparent', margin: 0, borderRadius: 0, padding: '12px 14px' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 3 }}>
+                    NEXT IN QUEUE
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: '15.5px', fontWeight: 800, color: 'var(--text-primary, #0F172A)' }}>
+                    {data.today.nextTask.title}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748B', marginTop: 2, display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span>🕒</span>
+                    <span>
+                      {data.today.nextTask.scheduledStart
+                        ? format(new Date(data.today.nextTask.scheduledStart), 'h:mm a')
+                        : 'Planned for today'}
+                      {data.today.nextTask.estimatedMinutes && ` · ${data.today.nextTask.estimatedMinutes} min`}
+                    </span>
+                  </div>
                 </div>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '15.5px', fontWeight: 800, color: '#0F172A' }}>
-                  {data.today.nextTask.title}
-                </div>
-                <div style={{ fontSize: '12px', color: '#64748B', marginTop: 2, display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <span>🕒</span>
-                  <span>
-                    {data.today.nextTask.scheduledStart
-                      ? format(new Date(data.today.nextTask.scheduledStart), 'h:mm a')
-                      : 'Planned for today'}
-                    {data.today.nextTask.estimatedMinutes && ` · ${data.today.nextTask.estimatedMinutes} min`}
-                  </span>
-                </div>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => handleToggleTask(data.today.nextTask!)}
+                  style={{ borderRadius: 14, padding: '7px 15px', fontWeight: 700, fontSize: '12px', flexShrink: 0 }}
+                >
+                  ✓ Done
+                </button>
               </div>
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={() => handleToggleTask(data.today.nextTask!)}
-                style={{ borderRadius: 14, padding: '7px 15px', fontWeight: 700, fontSize: '12px', flexShrink: 0 }}
-              >
-                ✓ Done
-              </button>
             </div>
           </div>
         )}

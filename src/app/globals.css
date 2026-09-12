@@ -5332,6 +5332,244 @@ input, textarea, select { font-family: inherit; }
   transform: scale(0.98);
 }
 
+/* ==========================================================
+   TASK BOMB FUSE DEADLINE COUNTDOWN & BURNING ROPE SYSTEM
+   ========================================================== */
 
+.home-task-card-wrapper {
+  background: var(--bg-surface);
+  border-radius: 16px;
+  border: 1.5px solid var(--border-subtle, #E2E8F0);
+  margin-bottom: 10px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+}
 
+.home-task-card-wrapper:hover {
+  border-color: var(--border-default, #CBD5E1);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
 
+[data-theme="dark"] .home-task-card-wrapper {
+  background: #131B2E;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.home-task-card-wrapper .home-task-row {
+  border-bottom: none;
+  padding: 8px 12px 10px 12px;
+}
+
+.task-card-wrapper {
+  background: var(--bg-surface);
+  border-radius: 16px;
+  border: 1.5px solid var(--border-subtle, #E2E8F0);
+  margin-bottom: 10px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+[data-theme="dark"] .task-card-wrapper {
+  background: #131B2E;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.task-card-wrapper .task-item {
+  border-bottom: none;
+  padding: 10px 14px 12px 14px;
+}
+
+.task-bomb-fuse-container {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  padding: 8px 12px 6px 12px;
+  position: relative;
+  overflow: visible;
+  transition: all 0.25s ease;
+  border-bottom: 1px dashed rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="dark"] .task-bomb-fuse-container {
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+.task-bomb-fuse-container.burning {
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.08), rgba(234, 88, 12, 0.08));
+}
+
+.task-bomb-fuse-container.urgent {
+  background: linear-gradient(90deg, rgba(239, 68, 68, 0.12), rgba(220, 38, 38, 0.18));
+  border-bottom-color: rgba(239, 68, 68, 0.3);
+  animation: urgentGlowPulse 2s infinite alternate;
+}
+
+.task-bomb-fuse-container.blasted {
+  background: linear-gradient(90deg, rgba(220, 38, 38, 0.18), rgba(153, 27, 27, 0.25));
+  border-bottom-color: rgba(220, 38, 38, 0.45);
+  animation: blastedShockPulse 1.2s infinite alternate;
+}
+
+.task-bomb-fuse-container.defused {
+  background: rgba(16, 185, 129, 0.05);
+  opacity: 0.65;
+}
+
+.task-bomb-fuse-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  line-height: 1;
+}
+
+.task-bomb-fuse-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.task-bomb-fuse-time {
+  font-size: 11px;
+  font-weight: 800;
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 0.2px;
+}
+
+.task-bomb-fuse-track-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  width: 100%;
+}
+
+.task-bomb-fuse-rope-track {
+  position: relative;
+  flex: 1;
+  height: 6.5px;
+  border-radius: 999px;
+  /* Natural braided rope appearance */
+  background: repeating-linear-gradient(
+    45deg,
+    #78350F,
+    #78350F 3px,
+    #92400E 3px,
+    #92400E 6px,
+    #B45309 6px,
+    #B45309 9px
+  );
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.05);
+  overflow: visible;
+}
+
+.task-bomb-fuse-rope-burned {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, #0F172A, #1E293B 70%, #334155);
+  border-radius: 999px 0 0 999px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.7);
+  transition: width 0.35s ease;
+}
+
+.task-bomb-fuse-spark-head {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.task-bomb-fuse-spark-flame {
+  font-size: 15px;
+  line-height: 1;
+  animation: sparkFlameFlicker 0.35s infinite alternate ease-in-out;
+  filter: drop-shadow(0 0 6px #F59E0B) drop-shadow(0 0 10px #EF4444);
+}
+
+.task-bomb-fuse-spark-ember {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #FFFFFF 20%, #F59E0B 60%, #EF4444 100%);
+  box-shadow: 0 0 8px #F59E0B, 0 0 14px #EF4444, 0 0 20px #DC2626;
+  animation: sparkEmberGlow 0.25s infinite alternate;
+}
+
+.task-bomb-fuse-bomb-icon {
+  font-size: 19px;
+  line-height: 1;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease;
+}
+
+.task-bomb-fuse-bomb-icon.burning {
+  animation: bombBreathing 2.2s infinite ease-in-out;
+}
+
+.task-bomb-fuse-bomb-icon.urgent {
+  animation: bombViolentShake 0.22s infinite alternate ease-in-out;
+  filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.85));
+}
+
+.task-bomb-fuse-bomb-icon.blasted {
+  font-size: 23px;
+  animation: bombBlastShock 0.7s infinite alternate ease-out;
+  filter: drop-shadow(0 0 12px rgba(220, 38, 38, 0.95));
+}
+
+@keyframes sparkFlameFlicker {
+  0% { transform: scale(0.85) rotate(-8deg); }
+  50% { transform: scale(1.2) rotate(5deg); }
+  100% { transform: scale(0.95) rotate(-4deg); }
+}
+
+@keyframes sparkEmberGlow {
+  0% { transform: scale(0.75); opacity: 0.8; }
+  100% { transform: scale(1.35); opacity: 1; }
+}
+
+@keyframes bombBreathing {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+@keyframes bombViolentShake {
+  0% { transform: translate(-2px, -1px) rotate(-5deg); }
+  25% { transform: translate(2px, 1px) rotate(5deg); }
+  50% { transform: translate(-1.5px, 2px) rotate(-4deg); }
+  75% { transform: translate(1.5px, -1px) rotate(4deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
+}
+
+@keyframes bombBlastShock {
+  0% { transform: scale(1); filter: drop-shadow(0 0 6px #EF4444); }
+  50% { transform: scale(1.35) rotate(7deg); filter: drop-shadow(0 0 18px #DC2626); }
+  100% { transform: scale(1.15) rotate(-6deg); filter: drop-shadow(0 0 12px #B91C1C); }
+}
+
+@keyframes urgentGlowPulse {
+  0% { box-shadow: 0 0 4px rgba(239, 68, 68, 0.15); }
+  100% { box-shadow: 0 0 14px rgba(239, 68, 68, 0.35); }
+}
+
+@keyframes blastedShockPulse {
+  0% { box-shadow: 0 0 6px rgba(220, 38, 38, 0.25); }
+  50% { box-shadow: 0 0 18px rgba(220, 38, 38, 0.55); }
+  100% { box-shadow: 0 0 6px rgba(220, 38, 38, 0.25); }
+}

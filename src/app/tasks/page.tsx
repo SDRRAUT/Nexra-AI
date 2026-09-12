@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AppHeader from '@/components/layout/AppHeader'
 import BottomNav from '@/components/layout/BottomNav'
+import TaskBombFuse from '@/components/tasks/TaskBombFuse'
 import { format } from 'date-fns'
 
 import {
@@ -213,119 +214,122 @@ export default function TasksPage() {
           )}
 
           {!loading && tasks.length > 0 && (
-            <div className="card">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {tasks.map(task => (
-                <div key={task.id} className="task-item fade-in-up">
-                  <div
-                    className={`task-checkbox ${task.status === 'completed' ? 'completed' : ''}`}
-                    onClick={() => handleComplete(task)}
-                    style={{ borderColor: task.status !== 'completed' ? priorityColors[task.priority] : undefined }}
-                  />
-                  <div className="task-content" onClick={() => router.push(`/tasks/${task.id}`)}>
-                    <div className={`task-title ${task.status === 'completed' ? 'completed' : ''}`}>{task.title}</div>
-                    <div className="task-meta">
-                      <span style={{
-                        fontSize: 'var(--text-xs)', fontWeight: 600,
-                        color: priorityColors[task.priority], background: priorityBg[task.priority],
-                        padding: '1px 6px', borderRadius: 'var(--radius-full)'
-                      }}>{task.priority}</span>
-                      {task.deadline && <span className="task-time">Due {format(new Date(task.deadline), 'MMM d')}</span>}
-                      {task.scheduledStart && <span className="task-time">{format(new Date(task.scheduledStart), 'h:mm a')}</span>}
-                      {task.isAiGenerated && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--brand-primary)' }}>🌱 AI</span>}
-                    </div>
-                  </div>
-                  <div style={{ position: 'relative' }}>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setActiveMenuTaskId(activeMenuTaskId === task.id ? null : task.id)
-                      }}
-                      style={{
-                        padding: '4px 8px',
-                        color: 'var(--text-tertiary)',
-                        flexShrink: 0,
-                        fontSize: 16,
-                        border: 'none',
-                        background: 'transparent',
-                        cursor: 'pointer',
-                        borderRadius: 'var(--radius-sm)',
-                      }}
-                      id={`menu-task-${task.id}`}
-                    >
-                      ⋮
-                    </button>
-
-                    {activeMenuTaskId === task.id && (
-                      <div
-                        className="card fade-in-up"
-                        style={{
-                          position: 'absolute',
-                          top: 'calc(100% + 2px)',
-                          right: 0,
-                          zIndex: 50,
-                          minWidth: 130,
-                          padding: 4,
-                          borderRadius: 'var(--radius-lg)',
-                          boxShadow: 'var(--shadow-xl)',
-                          background: 'var(--bg-surface)',
-                          border: '1px solid var(--border-default)',
-                        }}
-                      >
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setEditingTask({ ...task })
-                            setActiveMenuTaskId(null)
-                          }}
-                          style={{
-                            width: '100%',
-                            padding: '8px 10px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 6,
-                            border: 'none',
-                            background: 'transparent',
-                            color: 'var(--text-primary)',
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            textAlign: 'left',
-                            borderRadius: 'var(--radius-md)',
-                          }}
-                        >
-                          <span>✏️</span>
-                          <span>Edit Task</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setActiveMenuTaskId(null)
-                            handleDelete(task.id, task.title)
-                          }}
-                          style={{
-                            width: '100%',
-                            padding: '8px 10px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 6,
-                            border: 'none',
-                            background: 'transparent',
-                            color: 'var(--status-error, #EF4444)',
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            textAlign: 'left',
-                            borderRadius: 'var(--radius-md)',
-                          }}
-                        >
-                          <span>🗑️</span>
-                          <span>Delete</span>
-                        </button>
+                <div key={task.id} className="task-card-wrapper fade-in-up">
+                  <TaskBombFuse task={task} />
+                  <div className="task-item">
+                    <div
+                      className={`task-checkbox ${task.status === 'completed' ? 'completed' : ''}`}
+                      onClick={() => handleComplete(task)}
+                      style={{ borderColor: task.status !== 'completed' ? priorityColors[task.priority] : undefined }}
+                    />
+                    <div className="task-content" onClick={() => router.push(`/tasks/${task.id}`)}>
+                      <div className={`task-title ${task.status === 'completed' ? 'completed' : ''}`}>{task.title}</div>
+                      <div className="task-meta">
+                        <span style={{
+                          fontSize: 'var(--text-xs)', fontWeight: 600,
+                          color: priorityColors[task.priority], background: priorityBg[task.priority],
+                          padding: '1px 6px', borderRadius: 'var(--radius-full)'
+                        }}>{task.priority}</span>
+                        {task.deadline && <span className="task-time">Due {format(new Date(task.deadline), 'MMM d')}</span>}
+                        {task.scheduledStart && <span className="task-time">{format(new Date(task.scheduledStart), 'h:mm a')}</span>}
+                        {task.isAiGenerated && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--brand-primary)' }}>🌱 AI</span>}
                       </div>
-                    )}
+                    </div>
+                    <div style={{ position: 'relative' }}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setActiveMenuTaskId(activeMenuTaskId === task.id ? null : task.id)
+                        }}
+                        style={{
+                          padding: '4px 8px',
+                          color: 'var(--text-tertiary)',
+                          flexShrink: 0,
+                          fontSize: 16,
+                          border: 'none',
+                          background: 'transparent',
+                          cursor: 'pointer',
+                          borderRadius: 'var(--radius-sm)',
+                        }}
+                        id={`menu-task-${task.id}`}
+                      >
+                        ⋮
+                      </button>
+
+                      {activeMenuTaskId === task.id && (
+                        <div
+                          className="card fade-in-up"
+                          style={{
+                            position: 'absolute',
+                            top: 'calc(100% + 2px)',
+                            right: 0,
+                            zIndex: 50,
+                            minWidth: 130,
+                            padding: 4,
+                            borderRadius: 'var(--radius-lg)',
+                            boxShadow: 'var(--shadow-xl)',
+                            background: 'var(--bg-surface)',
+                            border: '1px solid var(--border-default)',
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setEditingTask({ ...task })
+                              setActiveMenuTaskId(null)
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '8px 10px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--text-primary)',
+                              fontSize: 'var(--text-xs)',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                              borderRadius: 'var(--radius-md)',
+                            }}
+                          >
+                            <span>✏️</span>
+                            <span>Edit</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDelete(task.id)
+                              setActiveMenuTaskId(null)
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '8px 10px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#EF4444',
+                              fontSize: 'var(--text-xs)',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                              borderRadius: 'var(--radius-md)',
+                            }}
+                          >
+                            <span>🗑️</span>
+                            <span>Delete</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
