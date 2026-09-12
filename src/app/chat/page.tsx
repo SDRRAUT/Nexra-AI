@@ -662,7 +662,11 @@ export default function ChatPage() {
             <div className="chat-pro-avatar-wrap">
               <div className="chat-pro-avatar-glow" />
               <div className="chat-pro-avatar">
-                <HeaderSparkleIcon />
+                <img
+                  src="/app-logo.png"
+                  alt="App Logo"
+                  className="chat-pro-logo-img"
+                />
               </div>
               <span className={`chat-pro-status-dot ${isLoading || isStreaming ? 'generating' : 'online'}`} />
             </div>
@@ -740,6 +744,11 @@ export default function ChatPage() {
             flexDirection: 'column',
           }}
         >
+          {/* Subtle Ambient App Logo Watermark */}
+          <div className="chat-ambient-watermark" aria-hidden="true">
+            <img src="/app-logo.png" alt="" />
+          </div>
+
           {/* Loading History Skeleton */}
           {isFetchingHistory && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: 'var(--space-4) 0' }}>
@@ -763,9 +772,16 @@ export default function ChatPage() {
                 minHeight: '100%',
               }}
             >
-              {/* 3D Iridescent Holographic Chromatic Orb */}
-              <div style={{ margin: '10px 0 18px 0', position: 'relative' }}>
-                <div className="chromatic-orb" />
+              {/* Transparent App Logo with Ambient Aura Glow */}
+              <div className="chat-welcome-logo-container">
+                <div className="chat-welcome-logo-glow" />
+                <div className="chat-welcome-logo-wrap">
+                  <img
+                    src="/app-logo.png"
+                    alt="Nexra"
+                    className="chat-welcome-logo-img"
+                  />
+                </div>
               </div>
 
               {/* Greeting Typography */}
@@ -889,8 +905,14 @@ export default function ChatPage() {
                 {/* Assistant Bottom Toolbar: Mini Chromatic Orb + Actions */}
                 <div className="chat-assistant-meta-bar">
                   <div className="chat-actions-group">
-                    {/* Mini Chromatic Orb Avatar */}
-                    <div className="chromatic-orb-mini" title={`${assistantName} AI Tutor`} />
+                    {/* Transparent App Logo Assistant Avatar */}
+                    <div className="chat-assistant-logo-mini" title={`${assistantName} AI Tutor`}>
+                      <img
+                        src="/app-logo.png"
+                        alt={assistantName}
+                        className="chat-assistant-logo-img"
+                      />
+                    </div>
 
                     {/* Copy Button */}
                     <button
