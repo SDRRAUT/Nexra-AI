@@ -23,6 +23,8 @@ export interface LocalTask {
   estimatedMinutes?: number
   isAiGenerated?: boolean
   postponeCount: number
+  autoOptimizedFrom?: string
+  autoOptimizedAt?: string
   completedAt?: string
   createdAt: string
 }

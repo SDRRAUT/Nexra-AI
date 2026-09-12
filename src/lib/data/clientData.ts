@@ -1,4 +1,5 @@
 import { localDb, ensureInitialData, type LocalTask, type LocalGoal, type LocalHabit, type LocalHabitLog, type LocalEvent, type LocalMemory } from '@/lib/db/localDb'
+import { format } from 'date-fns'
 
 export interface DashboardData {
   user: {
@@ -34,6 +35,7 @@ export function isOnboardingCompleted(): boolean {
 // ── 1. DASHBOARD DATA ─────────────────────────────────────────
 export async function getClientDashboard(): Promise<DashboardData> {
   await ensureInitialData()
+  await autoOptimizeOverdueTasks().catch(() => {})
 
   const [userList, tasks, habits, goals, events] = await Promise.all([
     localDb.user.toArray(),
@@ -96,9 +98,109 @@ function notifyDataChanged() {
 
 import { scheduleTaskReminder, syncAllActiveReminders } from '@/lib/notifications/native'
 
+// ── SMART AUTO-OPTIMIZER: AUTOMATICALLY ROLL OVER INCOMPLETE PAST TASKS TO TODAY ──
+export async function autoOptimizeOverdueTasks(): Promise<{
+  rolledOverCount: number
+  tasks: LocalTask[]
+}> {
+  try {
+    await ensureInitialData()
+    const allTasks = await localDb.tasks.toArray()
+    const today = new Date()
+    const todayStr = format(today, 'yyyy-MM-dd')
+    const now = today.getTime()
+
+    let rolledOverCount = 0
+    const updatedTasks: LocalTask[] = []
+
+    for (const task of allTasks) {
+      if (task.status === 'completed' || task.status === 'cancelled') continue
+
+      let taskDateStr: string | null = null
+      let originalDate: Date | null = null
+
+      if (task.scheduledStart) {
+        try {
+          const d = new Date(task.scheduledStart)
+          if (!isNaN(d.getTime())) {
+            taskDateStr = format(d, 'yyyy-MM-dd')
+            originalDate = d
+          }
+        } catch {}
+      } else if (task.deadline) {
+        try {
+          const d = new Date(task.deadline)
+          if (!isNaN(d.getTime())) {
+            taskDateStr = format(d, 'yyyy-MM-dd')
+            originalDate = d
+          }
+        } catch {}
+      } else if (task.createdAt) {
+        try {
+          const d = new Date(task.createdAt)
+          if (!isNaN(d.getTime())) {
+            taskDateStr = format(d, 'yyyy-MM-dd')
+            originalDate = d
+          }
+        } catch {}
+      }
+
+      // If task was scheduled/due on a past date before today
+      if (taskDateStr && taskDateStr < todayStr) {
+        const newScheduledDate = new Date(today)
+        if (originalDate) {
+          const origH = originalDate.getHours()
+          const origM = originalDate.getMinutes()
+          newScheduledDate.setHours(origH, origM, 0, 0)
+          // If scheduled time has already passed today, set to nearest upcoming 15m slot
+          if (newScheduledDate.getTime() < now) {
+            const currentH = today.getHours()
+            const currentM = today.getMinutes()
+            const nextSlotM = Math.ceil((currentM + 15) / 15) * 15
+            newScheduledDate.setHours(currentH, nextSlotM, 0, 0)
+          }
+        } else {
+          newScheduledDate.setHours(14, 0, 0, 0)
+        }
+
+        let newDeadline = task.deadline
+        if (task.deadline) {
+          const d = new Date(today)
+          d.setHours(23, 59, 59, 999)
+          newDeadline = d.toISOString()
+        }
+
+        const updates: Partial<LocalTask> = {
+          scheduledStart: newScheduledDate.toISOString(),
+          deadline: newDeadline,
+          postponeCount: (task.postponeCount || 0) + 1,
+          autoOptimizedFrom: taskDateStr,
+          autoOptimizedAt: new Date().toISOString(),
+        }
+
+        await localDb.tasks.update(task.id, updates)
+        updatedTasks.push({ ...task, ...updates } as LocalTask)
+        rolledOverCount++
+      }
+    }
+
+    if (rolledOverCount > 0) {
+      notifyDataChanged()
+    }
+
+    return { rolledOverCount, tasks: updatedTasks }
+  } catch (err) {
+    console.error('Auto-optimizer error:', err)
+    return { rolledOverCount: 0, tasks: [] }
+  }
+}
+
 // ── 2. TASKS CRUD ─────────────────────────────────────────────
-export async function getClientTasks(): Promise<LocalTask[]> {
+export async function getClientTasks(autoOptimize: boolean = true): Promise<LocalTask[]> {
   await ensureInitialData()
+  if (autoOptimize) {
+    await autoOptimizeOverdueTasks().catch(() => {})
+  }
   return localDb.tasks.toArray()
 }
 

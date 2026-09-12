@@ -28,6 +28,7 @@ import {
   deleteClientEvent,
   toggleClientTask,
   toggleClientHabit,
+  autoOptimizeOverdueTasks,
 } from '@/lib/data/clientData'
 import type { LocalHabitLog } from '@/lib/db/localDb'
 import ScheduleOptimizerModal from '@/components/calendar/ScheduleOptimizerModal'
@@ -42,6 +43,8 @@ interface Task {
   deadline?: string
   estimatedMinutes?: number
   category?: string
+  autoOptimizedFrom?: string
+  autoOptimizedAt?: string
   completedAt?: string
   createdAt?: string
 }
@@ -273,11 +276,19 @@ export default function CalendarPage() {
     estimatedMinutes: 45,
   })
 
+  const [optimizedCount, setOptimizedCount] = useState<number>(0)
+
   const loadAllCalendarData = async () => {
     try {
+      // 1. Run Smart Auto-Optimizer to automatically rollover incomplete past tasks to today
+      const optResult = await autoOptimizeOverdueTasks().catch(() => ({ rolledOverCount: 0, tasks: [] }))
+      if (optResult && optResult.rolledOverCount > 0) {
+        setOptimizedCount(optResult.rolledOverCount)
+      }
+
       const [ev, ta, go, ha, hl] = await Promise.all([
         getClientEvents(),
-        getClientTasks(),
+        getClientTasks(false),
         getClientGoals(),
         getClientHabits(),
         getClientHabitLogs(),
@@ -318,6 +329,9 @@ export default function CalendarPage() {
   // Smart multi-source resolver for any given day
   const getItemsForDay = (day: Date) => {
     const dayStr = format(day, 'yyyy-MM-dd')
+    const todayStr = format(new Date(), 'yyyy-MM-dd')
+    const isDayToday = dayStr === todayStr
+    const isDayPast = dayStr < todayStr
 
     const dayEvents = events.filter(e => {
       if (!e.startTime) return false
@@ -334,9 +348,30 @@ export default function CalendarPage() {
         const deadStr = t.deadline ? format(new Date(t.deadline), 'yyyy-MM-dd') : null
         const compStr = t.completedAt ? format(new Date(t.completedAt), 'yyyy-MM-dd') : null
         const createdStr = t.createdAt ? format(new Date(t.createdAt), 'yyyy-MM-dd') : null
+        const optFromStr = t.autoOptimizedFrom || null
 
         // Completed on this date
         if (compStr === dayStr) return true
+
+        // If viewing TODAY: always include tasks that were auto-optimized to today
+        if (isDayToday) {
+          if (startStr === dayStr || deadStr === dayStr) return true
+          if (optFromStr) return true
+          // Any incomplete task with a past schedule
+          if (t.status !== 'completed' && t.status !== 'cancelled') {
+            if (startStr && startStr < todayStr) return true
+            if (deadStr && deadStr < todayStr) return true
+          }
+        }
+
+        // If viewing a PAST day:
+        if (isDayPast) {
+          // If task was originally on this day and unfinished, show it here as well
+          if (optFromStr === dayStr || (!compStr && (startStr === dayStr || deadStr === dayStr))) {
+            return true
+          }
+        }
+
         // Scheduled or due on this date
         if (startStr === dayStr || deadStr === dayStr) return true
         // Created on this date and not explicitly scheduled for another future date
@@ -451,8 +486,22 @@ export default function CalendarPage() {
     loadAllCalendarData()
   }
 
+  interface CalendarActivityItem {
+    id: string
+    title: string
+    subtitle: string
+    timeLabel: string
+    theme: string
+    graphic: React.ReactNode
+    isNow: boolean
+    isDone: boolean
+    badge?: string
+    subtitleClass?: string
+    onToggle: () => Promise<void> | void
+  }
+
   // Map real user items into modern pastel activity cards
-  const userActivities = [
+  const userActivities: CalendarActivityItem[] = [
     ...selectedDayTasks.map((task, idx) => {
       const isDone = task.status === 'completed'
       const titleLower = task.title.toLowerCase()
@@ -479,15 +528,26 @@ export default function CalendarPage() {
         ? format(new Date(task.deadline), 'HH:mm')
         : '08:00'
 
+      const isAutoOptimizedToToday = isToday(selectedDate) && Boolean(task.autoOptimizedFrom)
+      const isMovedToToday = !isToday(selectedDate) && selectedDayStr < format(new Date(), 'yyyy-MM-dd') && !task.completedAt && (task.autoOptimizedFrom === selectedDayStr || task.status !== 'completed')
+
+      let badge = ''
+      if (isAutoOptimizedToToday) {
+        badge = `⚡ Auto-adjusted from ${task.autoOptimizedFrom ? format(new Date(task.autoOptimizedFrom), 'MMM d') : 'yesterday'}`
+      } else if (isMovedToToday) {
+        badge = '↪ Auto-adjusted to Today'
+      }
+
       return {
         id: task.id,
         title: task.title,
-        subtitle: isDone ? 'Completed' : timeStr,
+        subtitle: isDone ? 'Completed' : isMovedToToday ? 'Incomplete · Auto-adjusted to Today' : timeStr,
         timeLabel,
         theme,
         graphic,
         isNow: !isDone && idx === 0,
         isDone,
+        badge,
         subtitleClass: isDeep ? 'accent-blue' : '',
         onToggle: () => handleToggleTask(task),
       }
@@ -516,6 +576,7 @@ export default function CalendarPage() {
         graphic,
         isNow: idx === 0 && selectedDayTasks.length === 0,
         isDone: false,
+        badge: '',
         subtitleClass: '',
         onToggle: () => handleDeleteEvent(event.id, event.title),
       }
@@ -644,6 +705,58 @@ export default function CalendarPage() {
         </div>
       )}
 
+      {/* ── SMART AUTO-OPTIMIZER ACTIVE BANNER ── */}
+      <div
+        className="fade-in-up"
+        style={{
+          margin: '10px 16px 4px 16px',
+          padding: '8px 12px',
+          borderRadius: 14,
+          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(245, 158, 11, 0.08))',
+          border: '1px solid rgba(99, 102, 241, 0.2)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, flex: 1, minWidth: 0 }}>
+          <span style={{ fontSize: 16, flexShrink: 0 }}>⚡</span>
+          <div style={{ fontSize: '11.5px', color: 'var(--text-primary)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {optimizedCount > 0 ? (
+              <>
+                <strong style={{ color: '#4F46E5' }}>Auto-Optimizer:</strong> {optimizedCount} unfinished task{optimizedCount > 1 ? 's' : ''} from yesterday adjusted to today.
+              </>
+            ) : (
+              <>
+                <strong style={{ color: '#4F46E5' }}>Auto-Optimizer Active:</strong> Unfinished tasks automatically roll over to today.
+              </>
+            )}
+          </div>
+        </div>
+        <button
+          onClick={async () => {
+            const res = await autoOptimizeOverdueTasks()
+            if (res.rolledOverCount > 0) setOptimizedCount(res.rolledOverCount)
+            loadAllCalendarData()
+          }}
+          style={{
+            fontSize: '10.5px',
+            fontWeight: 700,
+            color: '#4F46E5',
+            background: 'rgba(99, 102, 241, 0.12)',
+            padding: '4px 10px',
+            borderRadius: 8,
+            border: 'none',
+            cursor: 'pointer',
+            flexShrink: 0,
+          }}
+          title="Run auto-optimizer immediately"
+        >
+          Sync Now
+        </button>
+      </div>
+
       {/* ── TODAY SUMMARY BOX ── */}
       <div className="modern-cal-summary-box">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -715,6 +828,24 @@ export default function CalendarPage() {
                     title="Click to toggle completed or manage"
                   >
                     <div style={{ flex: 1, minWidth: 0 }}>
+                      {act.badge && (
+                        <div
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            background: act.badge.includes('Today') ? 'rgba(99, 102, 241, 0.12)' : 'rgba(245, 158, 11, 0.14)',
+                            color: act.badge.includes('Today') ? '#4F46E5' : '#D97706',
+                            padding: '2px 7px',
+                            borderRadius: 6,
+                            fontSize: '10px',
+                            fontWeight: 700,
+                            marginBottom: 4,
+                          }}
+                        >
+                          {act.badge}
+                        </div>
+                      )}
                       <div
                         className="modern-activity-title"
                         style={{
