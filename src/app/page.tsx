@@ -709,33 +709,7 @@ export default function HomePage() {
         )}
 
 
-        {/* ── 5. SRUSHTI SUGGESTS BANNER ──────────────────────────────── */}
-        {briefing?.aiRecommendation && (
-          <div className="page-section">
-            <div
-              className="home-suggest-banner fade-in-up"
-              onClick={() => {
-                sessionStorage.setItem('srushti_prefill', `Regarding your briefing: "${briefing.aiRecommendation}" — let's organize this.`)
-                router.push('/chat')
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
-                <span style={{ fontSize: 22, flexShrink: 0 }}>🌱</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '10px', fontWeight: 800, color: '#6366F1', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    Nexra Suggests
-                  </div>
-                  <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {briefing.aiRecommendation}
-                  </div>
-                </div>
-              </div>
-              <span style={{ fontSize: '12px', fontWeight: 700, color: '#6366F1', flexShrink: 0 }}>
-                Act →
-              </span>
-            </div>
-          </div>
-        )}
+
 
         {/* ── 6. ⚠️ MISSED TASK RECOVERY (ACCOUNTABILITY) ──────────────── */}
         {missedTasks.length > 0 && (
