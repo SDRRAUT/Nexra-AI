@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useEffect, useState, useCallback } from 'react'
-import AppHeader from '@/components/layout/AppHeader'
+import { useRouter } from 'next/navigation'
 import BottomNav from '@/components/layout/BottomNav'
 import { format, formatDistanceToNow } from 'date-fns'
 import { streamClientChat } from '@/lib/ai/clientAi'
@@ -136,6 +136,18 @@ const MoreVerticalIcon = () => (
   </svg>
 )
 
+const BackIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M15 18l-6-6 6-6" />
+  </svg>
+)
+
+const HeaderSparkleIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 2L14.4 8.6L21 11L14.4 13.4L12 20L9.6 13.4L3 11L9.6 8.6L12 2Z" />
+  </svg>
+)
+
 const PlusIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round">
     <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
@@ -191,6 +203,7 @@ const WandIcon = () => (
 )
 
 export default function ChatPage() {
+  const router = useRouter()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [conversations, setConversations] = useState<ConversationItem[]>([])
   const [activeConvId, setActiveConvId] = useState<string | null>(null)
@@ -626,54 +639,83 @@ export default function ChatPage() {
 
   return (
     <div className="app-shell chat-ethereal-bg" style={{ height: '100dvh', maxHeight: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <AppHeader
-        showBrand={false}
-        showBack={true}
-        title="Smart Chat"
-        subtitle={`${assistantName} AI Tutor`}
-        rightContent={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <button
-              className="notif-btn"
-              onClick={startNewChat}
-              title="New Conversation"
-              id="new-chat-btn"
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: '50%',
-                background: 'rgba(255, 255, 255, 0.85)',
-                border: '1px solid rgba(226, 232, 240, 0.8)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-              }}
-            >
-              <PlusIcon />
-            </button>
-            <button
-              className="notif-btn"
-              onClick={() => setShowHistoryDrawer(true)}
-              title="Chat History"
-              id="chat-history-btn"
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: '50%',
-                background: 'rgba(255, 255, 255, 0.85)',
-                border: '1px solid rgba(226, 232, 240, 0.8)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-              }}
-            >
-              <MoreVerticalIcon />
-            </button>
+      {/* ══════════ ULTRA-PREMIUM AI CHAT HEADER ══════════ */}
+      <header className="chat-pro-header">
+        <div className="chat-pro-header-left">
+          <button
+            onClick={() => router.back()}
+            className="chat-pro-back-btn"
+            id="chat-back-btn"
+            aria-label="Go back"
+            title="Back"
+          >
+            <BackIcon />
+          </button>
+
+          <div
+            className="chat-pro-brand"
+            onClick={() => setShowHistoryDrawer(true)}
+            role="button"
+            tabIndex={0}
+            title="View Chat History"
+          >
+            <div className="chat-pro-avatar-wrap">
+              <div className="chat-pro-avatar-glow" />
+              <div className="chat-pro-avatar">
+                <HeaderSparkleIcon />
+              </div>
+              <span className={`chat-pro-status-dot ${isLoading || isStreaming ? 'generating' : 'online'}`} />
+            </div>
+
+            <div className="chat-pro-info">
+              <div className="chat-pro-title-row">
+                <span className="chat-pro-title">Smart Chat</span>
+                <span className="chat-pro-badge">AI 4.0</span>
+              </div>
+              <div className="chat-pro-status-row">
+                {isLoading || isStreaming ? (
+                  <span className="chat-pro-status-text generating">
+                    <span className="chat-generating-wave">
+                      <span />
+                      <span />
+                      <span />
+                    </span>
+                    Generating...
+                  </span>
+                ) : (
+                  <span className="chat-pro-status-text online">
+                    <span className="chat-micro-pulse-dot" />
+                    {assistantName} AI Tutor
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
-        }
-      />
+        </div>
+
+        <div className="chat-pro-header-right">
+          <button
+            onClick={startNewChat}
+            className="chat-pro-action-btn chat-pro-new-btn"
+            title="New Chat"
+            id="new-chat-btn"
+            aria-label="Start new conversation"
+          >
+            <PlusIcon />
+            <span className="chat-pro-btn-label">New</span>
+          </button>
+
+          <button
+            onClick={() => setShowHistoryDrawer(true)}
+            className="chat-pro-action-btn"
+            title="Chat History"
+            id="chat-history-btn"
+            aria-label="Open chat history"
+          >
+            <MoreVerticalIcon />
+          </button>
+        </div>
+      </header>
 
       {/* Main chat layout container */}
       <div
